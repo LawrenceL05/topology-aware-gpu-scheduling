@@ -1,4 +1,4 @@
-# Topology- and Workload-Aware GPU Scheduling
+# Topology and Workload Aware GPU Scheduling
 
 Research on GPU scheduling for distributed large language model (LLM) inference across heterogeneous GPU clusters using **Ray** and **NVIDIA Dynamo**.
 
