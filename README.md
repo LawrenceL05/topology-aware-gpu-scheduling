@@ -81,4 +81,20 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 
 ## Repository Status
 
-This repository currently contains the research overview. Implementation code, experiment configurations, datasets or workload traces, reproduction instructions, and quantitative results have not yet been added.
+This repository includes an initial Python placement policy and a Ray execution adapter, with tests and runnable examples. It is an experimental foundation: real GPU benchmarks, workload traces, automatic topology discovery and NVIDIA Dynamo integration are not yet included.
+
+## Ray Source and Runnable Integration
+
+- **[Complete Ray source code](https://github.com/ray-project/ray)** and **[the pinned Ray 2.49.0 source tree](https://github.com/ray-project/ray/tree/ray-2.49.0)**.
+- **[Ray integration and source guide](docs/ray-integration.md)**: explains the relevant Python and C++ components, our cost model, setup, and limitations.
+- **[Placement policy](topology_scheduler/policy.py)**: selects nodes using per-workload compute estimates, GPU memory/capacity and inter-node communication costs.
+- **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
+
+```bash
+python -m pip install -e '.[ray]'
+python -m examples.plan
+python -m unittest discover -s tests -v
+python -m examples.ray_smoke
+```
+
+The smoke example runs real Ray with simulated logical GPUs; it performs no CUDA work. The planner example uses synthetic inputs, not experimental results. See the guide for real-cluster setup and the distinction between node placement and physical GPU topology.

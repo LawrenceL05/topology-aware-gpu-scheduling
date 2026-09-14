@@ -1,0 +1,165 @@
+# Ray integration and source guide
+
+## Full Ray source
+
+Browse **[all Ray source code](https://github.com/ray-project/ray)**, or the
+**[Ray 2.49.0 source tree](https://github.com/ray-project/ray/tree/ray-2.49.0)**
+used by this prototype. To obtain the entire source locally:
+
+```bash
+git clone --branch ray-2.49.0 --depth 1 https://github.com/ray-project/ray.git
+```
+
+The clone includes that release's complete tracked source, but not its full Git
+history. Omit `--depth 1` for history. This project links upstream and installs
+Ray as a dependency; it does not duplicate Ray's source or claim authorship of
+it. Ray is licensed under [Apache 2.0](https://github.com/ray-project/ray/blob/ray-2.49.0/LICENSE).
+The version pin makes the prototype reproducible; it is not a claim that 2.49.0
+is the latest release. Upgrade only after rerunning the integration tests.
+
+## Where our code connects
+
+| Component | Source | Role |
+| --- | --- | --- |
+| Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
+| Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
+| Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
+| Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
+| Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.49.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
+| Ray node scheduling internals | [raylet scheduling directory](https://github.com/ray-project/ray/tree/ray-2.49.0/src/ray/raylet/scheduling) | Resource accounting and scheduling policies below the Python API. |
+| Ray Python runtime and libraries | [python/ray](https://github.com/ray-project/ray/tree/ray-2.49.0/python/ray) | Core APIs and higher-level libraries such as Train, Tune, Serve and Data. |
+| Ray C++ runtime | [src/ray](https://github.com/ray-project/ray/tree/ray-2.49.0/src/ray) | Distributed runtime implementation. |
+
+Read our policy and adapter first, then the two Python APIs, then the C++
+placement scheduler. Ray's other libraries are available through the full source
+tree; this prototype does not integrate each library individually.
+
+```mermaid
+flowchart LR
+  H[Supplied hardware and bandwidth profile] --> P[choose_placement]
+  W[Workload compute and memory estimates] --> P
+  P --> A[run: build one bundle per worker]
+  A --> G[Ray placement group reserves all bundles]
+  G --> T[Ray tasks use explicit bundle indices]
+  T --> R[Collect results and release reservation]
+```
+
+The planner is ordinary Python above Ray's scheduler, not a modification of
+Ray's C++ scheduler. Ray remains responsible for enforcing logical CPU/GPU
+allocations. Each selected node must advertise a unique custom resource such as
+`topology_node:a`; that constraint pins its bundles to that node. `PACK` is only
+a packing preference within those hard constraints. The adapter consumes the
+marker in both the bundle and the task, and uses an explicit bundle index.
+See Ray's [placement groups](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/placement-group.html)
+and [logical resources](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/resources.html).
+
+## Cost model
+
+For a fixed number of equal-sized ranks, the score in seconds is:
+
+```text
+max(compute_seconds_by_gpu[rank.gpu_model])
+  + sum(cross_node_gb_per_pair / link_bandwidth_GB_per_second)
+```
+
+The sum includes every unordered worker pair on different nodes. This is a
+simple serialized pair-traffic surrogate, not an NCCL collective simulator or
+a measured JCT prediction. Compute estimates must describe this workload at
+the requested worker count and include local communication. Supply measured
+profiles for meaningful decisions. GB and GB/s are decimal units; the argument
+`bandwidth_gbps` means gigabytes per second, not gigabits per second.
+
+The planner excludes nodes with insufficient per-GPU memory, zero available
+GPUs or an unknown GPU model. It rejects missing links when communication is
+required. Equal scores use node-name ordering for reproducibility. The search
+is exhaustive and capped at 100,000 candidate multisets; it is intended for
+small research clusters. It has no queue model, fairness, preemption or
+large-cluster search heuristic yet.
+
+## Run locally without physical GPUs
+
+From the repository root, using Python 3.10 or newer (3.12 is used in CI):
+
+```bash
+python -m pip install -e '.[ray]'
+python -m examples.plan
+python -m unittest discover -s tests -v
+python -m examples.ray_smoke
+python -m examples.ray_multinode_smoke
+```
+
+`examples.plan` uses synthetic costs. `examples.ray_smoke` starts a real local
+Ray runtime advertising **two simulated logical GPUs** and checks that two
+tasks receive distinct GPU IDs on the selected node. It does not execute CUDA,
+load a model or demonstrate GPU performance. Only use artificial GPU counts
+for this smoke test.
+
+The multi-node example uses Ray's test-cluster utility to start two local nodes
+and verifies their node IDs match the planned assignments. This tests node
+constraints, not a physical network or a multi-machine GPU deployment.
+
+## Run on a real cluster
+
+Install this package with the Ray extra on every node and the driver. On two
+Linux machines that each actually have two usable GPUs and at least two CPUs:
+
+```bash
+# Head machine a; use its reachable private address for HEAD_IP below.
+ray start --head --port=6379 --num-gpus=2 --resources='{"topology_node:a": 2}'
+# Worker machine b:
+ray start --address=HEAD_IP:6379 --num-gpus=2 --resources='{"topology_node:b": 2}'
+```
+
+Each marker must exist on exactly one live node, with one unit per usable GPU.
+Inventory assumes a single GPU model and uniform memory per node. Do not label
+a node as H100 or B200 unless that matches its hardware. The following driver
+is an example using illustrative inventory and timing inputs; replace those
+values with your own measurements:
+
+```python
+import ray
+from topology_scheduler import Node, Workload, choose_placement
+from topology_scheduler.ray_backend import run
+
+def worker(rank):
+    import ray
+    # Replace with application work. Ray sets CUDA_VISIBLE_DEVICES.
+    return {"rank": rank, "gpu_ids": ray.get_gpu_ids()}
+
+ray.init(address="auto")
+try:
+    plan = choose_placement(
+        [Node("a", "H100", 2, 80), Node("b", "B200", 2, 180)],
+        Workload(2, 40, {"H100": 10, "B200": 7}, 20),
+        {("a", "b"): 25},
+    )
+    print(run(plan, worker, reservation_timeout=60, execution_timeout=300))
+finally:
+    ray.shutdown()  # Disconnects this driver from the existing cluster.
+```
+
+The supplied `available_gpus` is a planning snapshot, not a live atomic claim.
+`ray.nodes()` checks total configured capacity and marker uniqueness; it does
+not provide authoritative per-node free capacity here. Ray's placement group
+is the actual reservation. If another job consumes capacity, the reservation
+can wait and time out. The adapter releases the group after success, timeout
+or task failure and cancels outstanding tasks. Removal is asynchronous. Refresh
+inventory and explicitly replan if needed; there is no silent fallback to a
+different placement. Driver disconnect is separate from shutting down cluster
+nodes.
+
+## Scope and next experiments
+
+This is a functional task-placement prototype, not a complete distributed LLM
+inference service. Each task requests one CPU and one GPU. Ray assigns the
+physical GPU IDs; the policy cannot select a particular NVLink pair within a
+node. It models inter-node links only. GPU memory is a supplied feasibility
+estimate, not an enforced memory reservation.
+
+For tensor-parallel inference, add model loading, rank rendezvous, collective
+communication and engine lifecycle handling in an appropriate worker/actor
+layer. NVIDIA Dynamo is still a research direction, with no Dynamo integration
+implemented here. No H100/B200 cluster experiment or improvement claim is
+included. Compare policies on matched traces and real hardware; report queue
+wait and execution boundaries, failures, utilization, and the chosen normalized
+JCT denominator separately from this placement score.
