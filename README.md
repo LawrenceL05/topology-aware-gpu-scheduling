@@ -71,7 +71,8 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 This repository includes an initial Python placement policy and a Ray execution adapter, with tests and runnable examples. It is an experimental foundation: real GPU benchmarks, workload traces, automatic topology discovery and NVIDIA Dynamo integration are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
-and known limitations.
+and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
+propose scheduler changes, run validation, and prepare a pull request.
 
 ## Ray Source and Runnable Integration
 

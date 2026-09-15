@@ -6,6 +6,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Contribution guidance for issues, development, research evidence, testing,
+  documentation, and pull requests.
+
 ### Planned
 
 - NVIDIA Dynamo integration is tracked in
@@ -61,6 +66,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - No queue model, fairness, preemption, automatic replanning, or Dynamo
   integration is included.
 
-[Unreleased]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/compare/a3668b8...HEAD
-[0.1.1]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/compare/4db520f...a3668b8
-[0.1.0]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/4db520f
+[Unreleased]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/LawrenceL05/topology-aware-gpu-scheduling/releases/tag/v0.1.0
