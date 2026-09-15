@@ -23,6 +23,7 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | --- | --- | --- |
 | Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
+| V1.1 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads its NVIDIA devices through NVML. |
 | Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
 | Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
 | Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.49.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
@@ -52,6 +53,41 @@ a packing preference within those hard constraints. The adapter consumes the
 marker in both the bundle and the task, and uses an explicit bundle index.
 See Ray's [placement groups](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/placement-group.html)
 and [logical resources](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/resources.html).
+
+## Automatic GPU inventory in V1.1
+
+V1.0 required callers to construct every `Node` with a manually entered GPU
+model, GPU count and memory size. V1.1 adds `discover_ray_gpu_inventory()` and
+`discover_planner_nodes()`. The collector reads live nodes from `ray.nodes()`,
+pins a zero-CPU probe task to each GPU node using
+`NodeAffinitySchedulingStrategy`, and uses Ray's bundled NVIDIA NVML bindings on
+that node.
+
+For every physical GPU it records the device index, UUID, full name, the
+accelerator type parsed by Ray, decimal GB of total memory, and PCI bus ID. The
+Ray node ID and its unique `topology_node:<name>` marker are retained. The
+planner conversion uses Ray's configured logical `GPU` quantity as capacity;
+NVML's physical device count is a consistency check.
+
+```python
+import ray
+from topology_scheduler import discover_planner_nodes
+
+ray.init(address="auto")
+nodes = discover_planner_nodes(timeout=30)
+```
+
+V1.1 does not use current free VRAM as `available_gpus`. Free VRAM is a changing
+observation and does not reserve a device. Ray's placement group remains the
+atomic capacity claim. The collector rejects mixed GPU models, non-uniform
+memory, fractional configured GPU capacity, missing node markers, and cases
+where Ray advertises more GPUs than NVML sees. These restrictions keep the
+automatically generated data faithful to the existing one-model-per-node
+`Node` schema.
+
+The collector obtains hardware inventory only. Workload compute measurements,
+memory requirements, communication volume, and link bandwidth are still inputs
+to the experiment. NVLink and network topology discovery are not part of V1.1.
 
 ## Cost model
 

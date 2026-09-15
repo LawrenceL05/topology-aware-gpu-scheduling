@@ -89,6 +89,7 @@ This repository includes an initial Python placement policy and a Ray execution 
 - **[Ray integration and source guide](docs/ray-integration.md)**: explains the relevant Python and C++ components, our cost model, setup, and limitations.
 - **[Placement policy](topology_scheduler/policy.py)**: selects nodes using per-workload compute estimates, GPU memory/capacity and inter-node communication costs.
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
+- **[V1.1 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads the GPU model, UUID, total memory and PCI bus ID through Ray's bundled NVIDIA NVML support.
 
 ```bash
 python -m pip install -e '.[ray]'
@@ -98,3 +99,20 @@ python -m examples.ray_smoke
 ```
 
 The smoke example runs real Ray with simulated logical GPUs; it performs no CUDA work. The planner example uses synthetic inputs, not experimental results. See the guide for real-cluster setup and the distinction between node placement and physical GPU topology.
+
+On a running NVIDIA GPU cluster, V1.1 constructs planner node inputs without
+manually entering GPU models, counts or memory:
+
+```python
+import ray
+from topology_scheduler import Workload, choose_placement, discover_planner_nodes
+
+ray.init(address="auto")
+nodes = discover_planner_nodes()
+plan = choose_placement(nodes, Workload(2, 40, {"H100": 10}), {})
+```
+
+The workload profile and network bandwidth remain explicit experimental inputs;
+they are not GPU hardware facts. Run `python -m examples.ray_inventory` to print
+the detected hardware. Each GPU node must advertise exactly one
+`topology_node:<name>` custom resource.
