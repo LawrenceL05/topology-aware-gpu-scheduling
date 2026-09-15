@@ -3,18 +3,18 @@
 ## Full Ray source
 
 Browse **[all Ray source code](https://github.com/ray-project/ray)**, or the
-**[Ray 2.49.0 source tree](https://github.com/ray-project/ray/tree/ray-2.49.0)**
+**[Ray 2.55.0 source tree](https://github.com/ray-project/ray/tree/ray-2.55.0)**
 used by this prototype. To obtain the entire source locally:
 
 ```bash
-git clone --branch ray-2.49.0 --depth 1 https://github.com/ray-project/ray.git
+git clone --branch ray-2.55.0 --depth 1 https://github.com/ray-project/ray.git
 ```
 
 The clone includes that release's complete tracked source, but not its full Git
 history. Omit `--depth 1` for history. This project links upstream and installs
 Ray as a dependency; it does not duplicate Ray's source or claim authorship of
-it. Ray is licensed under [Apache 2.0](https://github.com/ray-project/ray/blob/ray-2.49.0/LICENSE).
-The version pin makes the prototype reproducible; it is not a claim that 2.49.0
+it. Ray is licensed under [Apache 2.0](https://github.com/ray-project/ray/blob/ray-2.55.0/LICENSE).
+The version pin makes the prototype reproducible; it is not a claim that 2.55.0
 is the latest release. Upgrade only after rerunning the integration tests.
 
 ## Where our code connects
@@ -24,12 +24,12 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
 | V1.2 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads NVIDIA devices and their pairwise relationships through NVML. |
-| Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
-| Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
-| Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.49.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
-| Ray node scheduling internals | [raylet scheduling directory](https://github.com/ray-project/ray/tree/ray-2.49.0/src/ray/raylet/scheduling) | Resource accounting and scheduling policies below the Python API. |
-| Ray Python runtime and libraries | [python/ray](https://github.com/ray-project/ray/tree/ray-2.49.0/python/ray) | Core APIs and higher-level libraries such as Train, Tune, Serve and Data. |
-| Ray C++ runtime | [src/ray](https://github.com/ray-project/ray/tree/ray-2.49.0/src/ray) | Distributed runtime implementation. |
+| Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
+| Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
+| Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.55.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
+| Ray node scheduling internals | [raylet scheduling directory](https://github.com/ray-project/ray/tree/ray-2.55.0/src/ray/raylet/scheduling) | Resource accounting and scheduling policies below the Python API. |
+| Ray Python runtime and libraries | [python/ray](https://github.com/ray-project/ray/tree/ray-2.55.0/python/ray) | Core APIs and higher-level libraries such as Train, Tune, Serve and Data. |
+| Ray C++ runtime | [src/ray](https://github.com/ray-project/ray/tree/ray-2.55.0/src/ray) | Distributed runtime implementation. |
 
 Read our policy and adapter first, then the two Python APIs, then the C++
 placement scheduler. Ray's other libraries are available through the full source
@@ -51,8 +51,8 @@ allocations. Each selected node must advertise a unique custom resource such as
 `topology_node:a`; that constraint pins its bundles to that node. `PACK` is only
 a packing preference within those hard constraints. The adapter consumes the
 marker in both the bundle and the task, and uses an explicit bundle index.
-See Ray's [placement groups](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/placement-group.html)
-and [logical resources](https://docs.ray.io/en/releases-2.49.0/ray-core/scheduling/resources.html).
+See Ray's [placement groups](https://docs.ray.io/en/releases-2.55.0/ray-core/scheduling/placement-group.html)
+and [logical resources](https://docs.ray.io/en/releases-2.55.0/ray-core/scheduling/resources.html).
 
 ## Automatic GPU inventory in V1.1
 
@@ -201,8 +201,9 @@ not an enforced memory reservation.
 
 For tensor-parallel inference, add model loading, rank rendezvous, collective
 communication and engine lifecycle handling in an appropriate worker/actor
-layer. NVIDIA Dynamo is still a research direction, with no Dynamo integration
-implemented here. No H100/B200 cluster experiment or improvement claim is
-included. Compare policies on matched traces and real hardware; report queue
+layer. The [V1 Dynamo contract](dynamo-v1-contract.md) fixes that layer's first
+runtime and ownership boundary; the worker lifecycle is not implemented yet.
+No H100/B200 cluster experiment or improvement claim is included. Compare
+policies on matched traces and real hardware; report queue
 wait and execution boundaries, failures, utilization, and the chosen normalized
 JCT denominator separately from this placement score.

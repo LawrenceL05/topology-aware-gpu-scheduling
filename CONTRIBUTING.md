@@ -31,7 +31,7 @@ python -m pip install -e '.[ray]'
 python -m unittest discover -s tests -v
 ```
 
-The CI workflow uses Python 3.12 and Ray 2.49.0. Run the planner and Ray smoke
+The CI workflow uses Python 3.12 and Ray 2.55.0. Run the planner and Ray smoke
 examples when changing scheduling or execution behavior:
 
 ```bash
