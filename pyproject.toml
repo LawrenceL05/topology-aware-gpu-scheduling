@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 ray = ["ray==2.55.0"]
+kai = ["kubernetes>=34,<35"]
 
 [tool.setuptools.packages.find]
 include = ["topology_scheduler*"]

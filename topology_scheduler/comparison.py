@@ -36,6 +36,7 @@ class ExecutionRecord:
     execution_finished_ns: int
     status: str
     error: str | None = None
+    backend: str = "custom"
 
     def as_dict(self) -> dict:
         value = self.planning.as_dict()
@@ -45,6 +46,7 @@ class ExecutionRecord:
         })
         value["status"] = self.status
         value["error"] = self.error
+        value["backend"] = self.backend
         return value
 
 
@@ -106,17 +108,25 @@ def run_with_record(plan: Plan, planning: PlanningRecord, worker, *, backend=Non
     """Execute any policy through the same backend and record terminal status."""
     if plan.policy_name != planning.policy:
         raise ValueError("Plan and planning record policies must match")
-    if backend is None:
+    if backend is None or backend == "ray":
+        backend_name = "ray"
         from .ray_backend import run as backend
+    elif backend == "kai":
+        backend_name = "kai"
+        from .kai_backend import run as backend
+    elif isinstance(backend, str):
+        raise ValueError("backend must be 'ray', 'kai', or a callable")
+    else:
+        backend_name = getattr(backend, "__name__", "custom")
     started = perf_counter_ns()
     try:
         results = backend(plan, worker, **backend_options)
     except Exception as error:
         record = ExecutionRecord(
             planning, started, perf_counter_ns(), "failed",
-            f"{type(error).__name__}: {error}",
+            f"{type(error).__name__}: {error}", backend_name,
         )
         raise RecordedExecutionError(record) from error
     return results, ExecutionRecord(
-        planning, started, perf_counter_ns(), "succeeded"
+        planning, started, perf_counter_ns(), "succeeded", backend=backend_name,
     )

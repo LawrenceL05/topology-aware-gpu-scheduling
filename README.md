@@ -72,9 +72,10 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 ## Repository Status
 
 This repository includes an initial Python placement policy, automatic
-intra-node GPU topology discovery, and a Ray execution adapter. It is an
-experimental foundation: real GPU benchmarks, workload traces, inter-node
-topology discovery, and the Dynamo worker lifecycle are not yet included.
+intra-node GPU topology discovery, a Ray execution adapter, and a KAI Scheduler
+lifecycle adapter. It is an experimental foundation: real GPU benchmarks,
+workload traces, inter-node topology discovery, and the Dynamo worker lifecycle
+are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
@@ -103,10 +104,12 @@ now support controlled comparisons through one planner interface and the same
 Ray execution path. Run `python -m examples.compare_policies` to inspect their
 machine-readable decisions on synthetic inputs.
 
-The initial **[KAI Scheduler integration](docs/kai-integration.md)** maps the
-same backend-neutral plan to an external KAI PodGroup and node-pinned GPU Pods,
-with pure pre-submission validation that can be unit tested without a cluster.
-Run `python -m examples.kai_manifest` to inspect the synthetic object contract.
+The **[KAI Scheduler integration](docs/kai-integration.md)** maps the same
+backend-neutral plan to an external KAI PodGroup and node-pinned GPU Pods. It
+reads Nodes, Queues, GPU capacity, and RBAC from Kubernetes; then submits,
+watches, cancels, and cleans up the workload. Run `python -m
+examples.kai_manifest` to inspect objects without a cluster or `python -m
+examples.kai_submit --help` for the live-cluster path.
 
 On a running NVIDIA GPU cluster, V1.2 constructs planner node inputs without
 manually entering GPU models, counts or memory:
