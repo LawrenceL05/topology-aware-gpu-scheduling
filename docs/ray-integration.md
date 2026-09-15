@@ -23,7 +23,7 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | --- | --- | --- |
 | Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
-| V1.1 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads its NVIDIA devices through NVML. |
+| V1.2 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads NVIDIA devices and their pairwise relationships through NVML. |
 | Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
 | Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.49.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
 | Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.49.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
@@ -85,9 +85,15 @@ where Ray advertises more GPUs than NVML sees. These restrictions keep the
 automatically generated data faithful to the existing one-model-per-node
 `Node` schema.
 
-The collector obtains hardware inventory only. Workload compute measurements,
-memory requirements, communication volume, and link bandwidth are still inputs
-to the experiment. NVLink and network topology discovery are not part of V1.1.
+V1.2 extends the same probe with a complete undirected graph for the GPUs on
+each node. Every pair records its closest shared PCI/NUMA ancestor and the
+number of active direct NVLinks whose remote PCI identity is the other GPU.
+See [V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics
+and limitations.
+
+The collector obtains hardware topology only. Workload compute measurements,
+memory requirements, communication volume, and inter-node link bandwidth are
+still inputs to the experiment.
 
 ## Cost model
 
@@ -188,9 +194,10 @@ nodes.
 
 This is a functional task-placement prototype, not a complete distributed LLM
 inference service. Each task requests one CPU and one GPU. Ray assigns the
-physical GPU IDs; the policy cannot select a particular NVLink pair within a
-node. It models inter-node links only. GPU memory is a supplied feasibility
-estimate, not an enforced memory reservation.
+physical GPU IDs; although V1.2 discovers intra-node relationships, the policy
+cannot select a particular NVLink pair within a node. The cost model still
+models inter-node links only. GPU memory is a supplied feasibility estimate,
+not an enforced memory reservation.
 
 For tensor-parallel inference, add model loading, rank rendezvous, collective
 communication and engine lifecycle handling in an appropriate worker/actor

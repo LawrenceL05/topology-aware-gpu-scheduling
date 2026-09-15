@@ -7,10 +7,22 @@ from topology_scheduler.inventory import (
     RayNodeInventory,
     _node_marker,
     _read_nvml,
+    _read_nvml_snapshot,
 )
 
 
 class FakeNvml:
+    NVML_NVLINK_MAX_LINKS = 4
+    NVML_TOPOLOGY_INTERNAL = 0
+    NVML_TOPOLOGY_SINGLE = 10
+    NVML_TOPOLOGY_MULTIPLE = 20
+    NVML_TOPOLOGY_HOSTBRIDGE = 30
+    NVML_TOPOLOGY_NODE = 40
+    NVML_TOPOLOGY_SYSTEM = 50
+
+    class NVMLError(Exception):
+        pass
+
     def __init__(self):
         self.initialized = False
 
@@ -38,6 +50,24 @@ class FakeNvml:
     def nvmlDeviceGetPciInfo(self, handle):
         return SimpleNamespace(busId=f"0000:{handle:02x}:00.0".encode())
 
+    def nvmlDeviceGetTopologyCommonAncestor(self, left, right):
+        return self.NVML_TOPOLOGY_INTERNAL
+
+    def nvmlDeviceGetNvLinkState(self, handle, link):
+        return link in (0, 1)
+
+    def nvmlDeviceGetNvLinkRemotePciInfo(self, handle, link):
+        peer = 1 - handle
+        return SimpleNamespace(busId=f"0000:{peer:02x}:00.0".encode())
+
+
+class UnsupportedTopologyNvml(FakeNvml):
+    def nvmlDeviceGetTopologyCommonAncestor(self, left, right):
+        raise self.NVMLError()
+
+    def nvmlDeviceGetNvLinkState(self, handle, link):
+        raise self.NVMLError()
+
 
 class InventoryTests(unittest.TestCase):
     def test_reads_nvml_properties_via_ray_accelerator_parser(self):
@@ -47,6 +77,22 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual([d.accelerator_type for d in devices], ["H100", "H100"])
         self.assertEqual([d.memory_gb for d in devices], [80, 80])
         self.assertEqual([d.uuid for d in devices], ["GPU-0", "GPU-1"])
+
+    def test_reads_pair_topology_and_direct_nvlinks(self):
+        devices, connections = _read_nvml_snapshot(FakeNvml())
+        self.assertEqual(len(devices), 2)
+        self.assertEqual(len(connections), 1)
+        self.assertEqual(connections[0].source_uuid, "GPU-0")
+        self.assertEqual(connections[0].target_uuid, "GPU-1")
+        self.assertEqual(connections[0].common_ancestor, "internal")
+        self.assertEqual(connections[0].direct_nvlink_count, 2)
+
+    def test_preserves_devices_when_topology_queries_are_unsupported(self):
+        devices, connections = _read_nvml_snapshot(UnsupportedTopologyNvml())
+        self.assertEqual(len(devices), 2)
+        self.assertEqual(len(connections), 1)
+        self.assertIsNone(connections[0].common_ancestor)
+        self.assertIsNone(connections[0].direct_nvlink_count)
 
     def test_converts_detected_inventory_to_planner_node(self):
         device = GPUDevice(0, "GPU-0", "NVIDIA H100", "H100", 80, "0000:00:00.0")

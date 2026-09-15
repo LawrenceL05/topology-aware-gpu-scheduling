@@ -28,8 +28,9 @@ reserve the selected nodes.
 ```mermaid
 flowchart LR
     W[Workload] --> B["Baseline<br/>request N GPUs"]
-    W --> P["V1.1 planner"]
+    W --> P["Current planner"]
     H["Discovered GPU<br/>model and memory"] --> P
+    G["V1.2 intra-node<br/>GPU graph"] --> F["Next: enforceable<br/>device-aware placement"]
     T["Measured compute and<br/>network costs"] --> P
     B --> R[Ray scheduling]
     P --> C[Choose lowest-cost<br/>feasible nodes]
@@ -40,15 +41,15 @@ flowchart LR
     classDef proposed fill:#e8f5e9,stroke:#28823b,color:#222
     classDef shared fill:#e8eefb,stroke:#4263a5,color:#222
     class B baseline
-    class P,H,T,C proposed
+    class P,H,T,C,G,F proposed
     class W,R,E shared
 ```
 
-*Conceptual design, not measured results. The policy uses supplied workload and
-network measurements; V1.1 discovers GPU hardware but does not discover network
-topology or predict production JCT.*
+*Conceptual design, not measured results. V1.2 records intra-node GPU
+relationships, while the current policy still uses supplied workload and
+inter-node network measurements. It does not predict production JCT.*
 
-| | GPU-count baseline | V1.1 policy |
+| | GPU-count baseline | Current policy |
 | --- | --- | --- |
 | Inputs | Requested GPU count | GPU inventory, workload profile, and link costs |
 | Decision | Ray selects a feasible placement | Planner selects nodes; Ray reserves and executes |
@@ -61,6 +62,8 @@ support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html).
 
 See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
 startup and GPU discovery through planning, reservation, execution, and cleanup.
+The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)** explains the new
+GPU relationship graph and its current enforcement boundary.
 
 ## Evaluation
 
@@ -68,7 +71,10 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 
 ## Repository Status
 
-This repository includes an initial Python placement policy and a Ray execution adapter, with tests and runnable examples. It is an experimental foundation: real GPU benchmarks, workload traces, automatic topology discovery and NVIDIA Dynamo integration are not yet included.
+This repository includes an initial Python placement policy, automatic
+intra-node GPU topology discovery, and a Ray execution adapter. It is an
+experimental foundation: real GPU benchmarks, workload traces, inter-node
+topology discovery, and NVIDIA Dynamo integration are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
@@ -80,7 +86,7 @@ propose scheduler changes, run validation, and prepare a pull request.
 - **[Ray integration and source guide](docs/ray-integration.md)**: explains the relevant Python and C++ components, our cost model, setup, and limitations.
 - **[Placement policy](topology_scheduler/policy.py)**: selects nodes using per-workload compute estimates, GPU memory/capacity and inter-node communication costs.
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
-- **[V1.1 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads the GPU model, UUID, total memory and PCI bus ID through Ray's bundled NVIDIA NVML support.
+- **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
 
 ```bash
 python -m pip install -e '.[ray]'
@@ -91,7 +97,7 @@ python -m examples.ray_smoke
 
 The smoke example runs real Ray with simulated logical GPUs; it performs no CUDA work. The planner example uses synthetic inputs, not experimental results. See the guide for real-cluster setup and the distinction between node placement and physical GPU topology.
 
-On a running NVIDIA GPU cluster, V1.1 constructs planner node inputs without
+On a running NVIDIA GPU cluster, V1.2 constructs planner node inputs without
 manually entering GPU models, counts or memory:
 
 ```python
@@ -103,7 +109,9 @@ nodes = discover_planner_nodes()
 plan = choose_placement(nodes, Workload(2, 40, {"H100": 10}), {})
 ```
 
-The workload profile and network bandwidth remain explicit experimental inputs;
-they are not GPU hardware facts. Run `python -m examples.ray_inventory` to print
-the detected hardware. Each GPU node must advertise exactly one
-`topology_node:<name>` custom resource.
+The workload profile and inter-node network bandwidth remain explicit
+experimental inputs; they are not GPU hardware facts. Run
+`python -m examples.ray_inventory` to print the detected hardware and
+intra-node graph. Each GPU node must advertise exactly one
+`topology_node:<name>` custom resource. The current Ray adapter reserves a node
+but cannot select a particular physical GPU pair from this graph.
