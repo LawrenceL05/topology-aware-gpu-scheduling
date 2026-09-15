@@ -74,7 +74,7 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 This repository includes an initial Python placement policy, automatic
 intra-node GPU topology discovery, and a Ray execution adapter. It is an
 experimental foundation: real GPU benchmarks, workload traces, inter-node
-topology discovery, and NVIDIA Dynamo integration are not yet included.
+topology discovery, and the Dynamo worker lifecycle are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
@@ -82,11 +82,12 @@ propose scheduler changes, run validation, and prepare a pull request.
 
 ## Ray Source and Runnable Integration
 
-- **[Complete Ray source code](https://github.com/ray-project/ray)** and **[the pinned Ray 2.49.0 source tree](https://github.com/ray-project/ray/tree/ray-2.49.0)**.
+- **[Complete Ray source code](https://github.com/ray-project/ray)** and **[the pinned Ray 2.55.0 source tree](https://github.com/ray-project/ray/tree/ray-2.55.0)**.
 - **[Ray integration and source guide](docs/ray-integration.md)**: explains the relevant Python and C++ components, our cost model, setup, and limitations.
 - **[Placement policy](topology_scheduler/policy.py)**: selects nodes using per-workload compute estimates, GPU memory/capacity and inter-node communication costs.
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
 - **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
+- **[V1 Dynamo contract](docs/dynamo-v1-contract.md)**: pins the Ray, Dynamo, vLLM, Python, CUDA, driver, Linux, model, ownership, readiness, and shutdown contract for independent single-GPU replicas.
 
 ```bash
 python -m pip install -e '.[ray]'
