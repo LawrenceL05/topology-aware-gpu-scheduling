@@ -97,6 +97,11 @@ python -m examples.ray_smoke
 
 The smoke example runs real Ray with simulated logical GPUs; it performs no CUDA work. The planner example uses synthetic inputs, not experimental results. See the guide for real-cluster setup and the distinction between node placement and physical GPU topology.
 
+Five deterministic **[reference baseline policies](docs/baseline-policies.md)**
+now support controlled comparisons through one planner interface and the same
+Ray execution path. Run `python -m examples.compare_policies` to inspect their
+machine-readable decisions on synthetic inputs.
+
 On a running NVIDIA GPU cluster, V1.2 constructs planner node inputs without
 manually entering GPU models, counts or memory:
 
