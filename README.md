@@ -21,59 +21,46 @@ This research aims to develop topology- and workload-aware GPU scheduling strate
 
 ## How This Approach Differs
 
-The comparison below uses a **GPU-count-only baseline**: a Ray task or actor requests a number of GPUs without an accelerator-type constraint or a workload-specific hardware preference. This is a baseline configuration, not a limitation of all Ray scheduling.
+The baseline requests only a GPU count. Our policy also considers discovered
+hardware, workload measurements, and communication cost before asking Ray to
+reserve the selected nodes.
 
 ```mermaid
-flowchart TB
-    W["Same distributed LLM inference workload"]
-    W --> B
-    W --> P
+flowchart LR
+    W[Workload] --> B["Baseline<br/>request N GPUs"]
+    W --> P["V1.1 planner"]
+    H["Discovered GPU<br/>model and memory"] --> P
+    T["Measured compute and<br/>network costs"] --> P
+    B --> R[Ray scheduling]
+    P --> C[Choose lowest-cost<br/>feasible nodes]
+    C --> R
+    R --> E[Compare normalized JCT<br/>on matched workloads]
 
-    subgraph BASE["Baseline: GPU-count-only scheduling"]
-        B["Request: N logical GPUs"]
-        B --> BF["Check requested resources and availability"]
-        BF --> BH["H100 placement candidate"]
-        BF --> BB["B200 placement candidate"]
-        BH --> BO["GPU model does not distinguish candidates<br/>in this baseline's GPU request"]
-        BB --> BO
-    end
-
-    subgraph PROP["Proposed research: hardware + workload + topology"]
-        P["Request + workload profile"]
-        H["GPU model: H100 / B200<br/>Memory capacity and measured performance"]
-        T["Cluster topology<br/>Connectivity and communication costs"]
-        Q["Current availability and queue state"]
-        P --> S["Compare feasible placements<br/>using workload-specific performance estimates"]
-        H --> S
-        T --> S
-        Q --> S
-        S --> C["Choose GPU model and placement<br/>for the workload and cluster state"]
-        C --> O["Goal: lower job completion time<br/>and higher cluster utilization"]
-    end
-
-    BO --> E["Evaluate both policies on matched workloads<br/>Metric: normalized JCT"]
-    O --> E
-
-    classDef baseline fill:#fff3e0,stroke:#c77800,color:#222;
-    classDef proposed fill:#e8f5e9,stroke:#28823b,color:#222;
-    classDef shared fill:#e8eefb,stroke:#4263a5,color:#222;
-    class B,BF,BH,BB,BO baseline;
-    class P,H,T,Q,S,C,O proposed;
-    class W,E shared;
+    classDef baseline fill:#fff3e0,stroke:#c77800,color:#222
+    classDef proposed fill:#e8f5e9,stroke:#28823b,color:#222
+    classDef shared fill:#e8eefb,stroke:#4263a5,color:#222
+    class B baseline
+    class P,H,T,C proposed
+    class W,R,E shared
 ```
 
-*Conceptual design, not measured results. H100 and B200 are illustrative GPU models; the diagram does not imply a fixed performance ranking or confirm which hardware was used in experiments. Performance estimates and queue-aware decisions are proposed design inputs.*
+*Conceptual design, not measured results. The policy uses supplied workload and
+network measurements; V1.1 discovers GPU hardware but does not discover network
+topology or predict production JCT.*
 
-| Decision dimension | GPU-count-only baseline | Proposed research policy |
+| | GPU-count baseline | V1.1 policy |
 | --- | --- | --- |
-| GPU request | Number of logical GPUs | GPU count plus hardware and workload information |
-| H100 versus B200 | No model preference expressed | Compare workload-specific suitability |
-| Workload characteristics | No hardware performance model in this baseline | Use workload profiles to inform placement |
-| Interconnect topology | No explicit communication-cost model in this baseline | Consider communication costs between GPUs and nodes |
-| Placement objective | Satisfy resource requests under the configured scheduler | Aim to reduce JCT and improve utilization |
-| Evidence | Reference policy for experiments | Benefits must be established through matched experiments |
+| Inputs | Requested GPU count | GPU inventory, workload profile, and link costs |
+| Decision | Ray selects a feasible placement | Planner selects nodes; Ray reserves and executes |
+| Objective | Satisfy the resource request | Minimize the planner's estimated compute + communication cost |
 
-**Ray capability note:** Ray supports accelerator-type constraints and custom resources, so it would be inaccurate to say Ray cannot distinguish GPU models. The research distinction is the proposed policy for choosing among feasible hardware and topology options based on workload characteristics. Accelerator-type filtering alone does not establish that policy. See [Ray accelerator support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html) and [Ray logical resources](https://docs.ray.io/en/latest/ray-core/scheduling/resources.html).
+Ray already supports accelerator constraints and custom resources. This research
+adds a workload-specific policy for choosing among feasible placements; Ray
+still performs resource accounting and task execution. See [Ray accelerator
+support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html).
+
+See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
+startup and GPU discovery through planning, reservation, execution, and cleanup.
 
 ## Evaluation
 
