@@ -6,12 +6,6 @@ new scheduling policies, public APIs, or experimental methodology, open an
 issue first so the design and evidence requirements can be agreed on before
 implementation.
 
-This process follows the useful parts of the
-[Ray contribution guide](https://github.com/ray-project/ray/blob/master/CONTRIBUTING.rst)
-and the
-[KAI Scheduler contribution guide](https://github.com/kai-scheduler/KAI-Scheduler/blob/main/CONTRIBUTING.md),
-adapted to this repository's smaller Python research prototype.
-
 ## Report an issue
 
 Search the existing issues before opening a new one. A useful bug report
