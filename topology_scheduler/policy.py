@@ -1,6 +1,7 @@
-"""Small-cluster exhaustive node placement, with explicit estimated costs."""
+"""Deterministic reference policies for small-cluster node placement."""
 
 from dataclasses import dataclass
+from enum import Enum
 from itertools import combinations, combinations_with_replacement
 from math import comb, isfinite
 from typing import Mapping
@@ -9,6 +10,16 @@ from typing import Mapping
 def positive(value: float, name: str, *, zero: bool = False) -> None:
     if not isfinite(value) or value < 0 or (value == 0 and not zero):
         raise ValueError(f"{name} must be finite and {'nonnegative' if zero else 'positive'}")
+
+
+class PolicyName(str, Enum):
+    """Stable names written to comparison results."""
+
+    GPU_COUNT = "gpu_count"
+    ACCELERATOR_TYPE = "accelerator_type"
+    WORKLOAD_COMPUTE = "workload_compute"
+    TOPOLOGY_ONLY = "topology_only"
+    COMBINED = "combined"
 
 
 @dataclass(frozen=True)
@@ -51,48 +62,104 @@ class Workload:
 @dataclass(frozen=True)
 class Plan:
     workers: tuple[Node, ...]
-    estimated_seconds: float
+    estimated_seconds: float | None
+    policy_name: str = PolicyName.COMBINED.value
+
+    def as_dict(self) -> dict:
+        return {
+            "policy": self.policy_name,
+            "placement": [node.name for node in self.workers],
+            "estimated_seconds": self.estimated_seconds,
+        }
 
 
-def choose_placement(nodes: list[Node], workload: Workload,
-                     bandwidth_gbps: Mapping[tuple[str, str], float],
-                     *, max_candidates: int = 100_000) -> Plan:
-    """Minimize slowest-rank compute + serialized cross-node pair traffic.
+def _policy(value: PolicyName | str) -> PolicyName:
+    try:
+        return PolicyName(value)
+    except ValueError as error:
+        names = ", ".join(item.value for item in PolicyName)
+        raise ValueError(f"Unknown policy {value!r}; choose one of: {names}") from error
 
-    Bandwidth is GB/s (not bits/s). Missing links make communicating placements
-    infeasible. The symmetric link map uses lexically sorted node-name pairs.
-    Local communication must already be included in the compute estimates.
+
+def _communication_cost(
+    workers: tuple[Node, ...], workload: Workload,
+    bandwidth_gbps: Mapping[tuple[str, str], float],
+) -> float:
+    cost = 0.0
+    for left, right in combinations(workers, 2):
+        if left.name == right.name or not workload.cross_node_gb_per_pair:
+            continue
+        bandwidth = bandwidth_gbps.get(tuple(sorted((left.name, right.name))))
+        if bandwidth is None:
+            return float("inf")
+        cost += workload.cross_node_gb_per_pair / bandwidth
+    return cost
+
+
+def choose_placement(
+    nodes: list[Node], workload: Workload,
+    bandwidth_gbps: Mapping[tuple[str, str], float], *,
+    policy: PolicyName | str = PolicyName.COMBINED,
+    accelerator_type: str | None = None,
+    max_candidates: int = 100_000,
+) -> Plan:
+    """Choose a placement with one of five deterministic reference policies.
+
+    Every policy applies GPU capacity and per-GPU memory feasibility. Candidate
+    placements and ties are ordered lexicographically by node name. Bandwidth is
+    GB/s and uses sorted node-name pairs. Missing links make a communicating
+    candidate infeasible only for policies that use topology.
     """
-    if len({n.name for n in nodes}) != len(nodes):
+    selected_policy = _policy(policy)
+    if len({node.name for node in nodes}) != len(nodes):
         raise ValueError("Node names must be unique")
-    for (a, b), value in bandwidth_gbps.items():
-        if a >= b:
+    for (left, right), value in bandwidth_gbps.items():
+        if left >= right:
             raise ValueError("Bandwidth keys must be sorted distinct node-name pairs")
         positive(value, "bandwidth")
-    eligible = sorted((n for n in nodes if n.available_gpus > 0
-                       and n.memory_gb_per_gpu >= workload.memory_gb_per_worker
-                       and n.gpu_model in workload.compute_seconds_by_gpu),
-                      key=lambda n: n.name)
-    if sum(n.available_gpus for n in eligible) < workload.workers:
+    if selected_policy is PolicyName.ACCELERATOR_TYPE and not accelerator_type:
+        raise ValueError("accelerator_type policy requires accelerator_type")
+
+    needs_compute = selected_policy in (PolicyName.WORKLOAD_COMPUTE, PolicyName.COMBINED)
+    eligible = sorted(
+        (
+            node for node in nodes
+            if node.available_gpus > 0
+            and node.memory_gb_per_gpu >= workload.memory_gb_per_worker
+            and (not needs_compute or node.gpu_model in workload.compute_seconds_by_gpu)
+            and (selected_policy is not PolicyName.ACCELERATOR_TYPE
+                 or node.gpu_model == accelerator_type)
+        ),
+        key=lambda node: node.name,
+    )
+    if sum(node.available_gpus for node in eligible) < workload.workers:
         raise ValueError("Insufficient compatible GPU capacity")
     count = comb(len(eligible) + workload.workers - 1, workload.workers)
     if count > max_candidates:
         raise ValueError(f"Search requires {count} candidates; limit is {max_candidates}")
-    best = None
+
+    scored: list[tuple[float, tuple[str, ...], Plan]] = []
     for indices in combinations_with_replacement(range(len(eligible)), workload.workers):
-        if any(indices.count(i) > eligible[i].available_gpus for i in set(indices)):
+        if any(indices.count(index) > eligible[index].available_gpus for index in set(indices)):
             continue
-        workers = tuple(eligible[i] for i in indices)
-        cost = max(workload.compute_seconds_by_gpu[n.gpu_model] for n in workers)
-        for a, b in combinations(workers, 2):
-            if a.name != b.name and workload.cross_node_gb_per_pair:
-                bandwidth = bandwidth_gbps.get(tuple(sorted((a.name, b.name))))
-                if bandwidth is None:
-                    cost = float("inf")
-                    break
-                cost += workload.cross_node_gb_per_pair / bandwidth
-        if isfinite(cost) and (best is None or cost < best.estimated_seconds):
-            best = Plan(workers, cost)
-    if best is None:
-        raise ValueError("No feasible placement with known communication links")
-    return best
+        workers = tuple(eligible[index] for index in indices)
+        estimate: float | None = None
+        if selected_policy is PolicyName.WORKLOAD_COMPUTE:
+            estimate = max(workload.compute_seconds_by_gpu[node.gpu_model] for node in workers)
+        elif selected_policy is PolicyName.TOPOLOGY_ONLY:
+            estimate = _communication_cost(workers, workload, bandwidth_gbps)
+        elif selected_policy is PolicyName.COMBINED:
+            estimate = (
+                max(workload.compute_seconds_by_gpu[node.gpu_model] for node in workers)
+                + _communication_cost(workers, workload, bandwidth_gbps)
+            )
+        if estimate is not None and not isfinite(estimate):
+            continue
+        tie_break = tuple(node.name for node in workers)
+        scored.append((estimate if estimate is not None else 0.0, tie_break,
+                       Plan(workers, estimate, selected_policy.value)))
+    if not scored:
+        if selected_policy in (PolicyName.TOPOLOGY_ONLY, PolicyName.COMBINED):
+            raise ValueError("No feasible placement with known communication links")
+        raise ValueError("No feasible placement")
+    return min(scored, key=lambda item: (item[0], item[1]))[2]
