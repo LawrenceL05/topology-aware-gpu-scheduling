@@ -1,6 +1,7 @@
 """Discover planner GPU inventory by probing every live Ray node."""
 
 from dataclasses import dataclass
+from itertools import combinations
 from math import isclose
 
 from .policy import Node
@@ -19,6 +20,16 @@ class GPUDevice:
 
 
 @dataclass(frozen=True)
+class GPUConnection:
+    """Undirected NVML relationship between two GPUs on the same node."""
+
+    source_uuid: str
+    target_uuid: str
+    common_ancestor: str | None
+    direct_nvlink_count: int | None
+
+
+@dataclass(frozen=True)
 class RayNodeInventory:
     """The detected GPUs and Ray scheduling identity of one node."""
 
@@ -27,6 +38,7 @@ class RayNodeInventory:
     resource_key: str
     configured_gpus: int
     devices: tuple[GPUDevice, ...]
+    connections: tuple[GPUConnection, ...] = ()
 
     def as_planner_node(self) -> Node:
         """Convert a homogeneous Ray node into the V1 planner input."""
@@ -60,15 +72,79 @@ def _text(value) -> str:
     return value.decode("utf-8") if isinstance(value, bytes) else str(value)
 
 
-def _read_nvml(nvml) -> tuple[GPUDevice, ...]:
-    """Read static properties for every NVIDIA device visible to NVML."""
+def _topology_name(nvml, value: int) -> str:
+    names = {
+        nvml.NVML_TOPOLOGY_INTERNAL: "internal",
+        nvml.NVML_TOPOLOGY_SINGLE: "single-pci-bridge",
+        nvml.NVML_TOPOLOGY_MULTIPLE: "multiple-pci-bridges",
+        nvml.NVML_TOPOLOGY_HOSTBRIDGE: "host-bridge",
+        nvml.NVML_TOPOLOGY_NODE: "numa-node",
+        nvml.NVML_TOPOLOGY_SYSTEM: "system",
+    }
+    return names.get(value, f"unknown-{value}")
+
+
+def _direct_nvlink_count(nvml, handle, target_pci_bus_id: str) -> int | None:
+    """Count active links to a GPU, or return ``None`` when NVML cannot tell."""
+    count = 0
+    state_queries = 0
+    unresolved_active_link = False
+    for link in range(nvml.NVML_NVLINK_MAX_LINKS):
+        try:
+            if not nvml.nvmlDeviceGetNvLinkState(handle, link):
+                state_queries += 1
+                continue
+            state_queries += 1
+        except nvml.NVMLError:
+            # NVLink inspection is unavailable on some drivers and devices.
+            continue
+        try:
+            remote = nvml.nvmlDeviceGetNvLinkRemotePciInfo(handle, link)
+            if _text(remote.busId).lower() == target_pci_bus_id.lower():
+                count += 1
+        except nvml.NVMLError:
+            # An active NVSwitch link may not expose a remote GPU PCI identity.
+            unresolved_active_link = True
+    if state_queries == 0 or unresolved_active_link:
+        return None
+    return count
+
+
+def _common_ancestor(nvml, left_handle, right_handle) -> str | None:
+    """Return the normalized PCI/NUMA relationship when NVML supports it."""
+    try:
+        value = nvml.nvmlDeviceGetTopologyCommonAncestor(left_handle, right_handle)
+    except nvml.NVMLError:
+        return None
+    return _topology_name(nvml, value)
+
+
+def _undirected_nvlink_count(
+        nvml, left_handle, right_handle, left_pci: str, right_pci: str
+) -> int | None:
+    """Reconcile the NVLink count reported by both endpoints of a GPU pair."""
+    forward = _direct_nvlink_count(nvml, left_handle, right_pci)
+    reverse = _direct_nvlink_count(nvml, right_handle, left_pci)
+    known = [count for count in (forward, reverse) if count is not None]
+    if not known:
+        return None
+    if len(known) == 2 and forward != reverse:
+        return None
+    return known[0]
+
+
+def _read_nvml_snapshot(
+        nvml) -> tuple[tuple[GPUDevice, ...], tuple[GPUConnection, ...]]:
+    """Read static GPU properties and pair topology in one NVML session."""
     from ray._private.accelerators.nvidia_gpu import NvidiaGPUAcceleratorManager
 
     nvml.nvmlInit()
     try:
         devices = []
+        handles = []
         for index in range(nvml.nvmlDeviceGetCount()):
             handle = nvml.nvmlDeviceGetHandleByIndex(index)
+            handles.append(handle)
             name = _text(nvml.nvmlDeviceGetName(handle))
             accelerator_type = NvidiaGPUAcceleratorManager._gpu_name_to_accelerator_type(name)
             if not accelerator_type:
@@ -83,9 +159,30 @@ def _read_nvml(nvml) -> tuple[GPUDevice, ...]:
                 memory_gb=memory.total / 1_000_000_000,
                 pci_bus_id=_text(pci.busId),
             ))
-        return tuple(devices)
+        connections = []
+        for left, right in combinations(range(len(devices)), 2):
+            connections.append(GPUConnection(
+                source_uuid=devices[left].uuid,
+                target_uuid=devices[right].uuid,
+                common_ancestor=_common_ancestor(
+                    nvml, handles[left], handles[right]
+                ),
+                direct_nvlink_count=_undirected_nvlink_count(
+                    nvml,
+                    handles[left],
+                    handles[right],
+                    devices[left].pci_bus_id,
+                    devices[right].pci_bus_id,
+                ),
+            ))
+        return tuple(devices), tuple(connections)
     finally:
         nvml.nvmlShutdown()
+
+
+def _read_nvml(nvml) -> tuple[GPUDevice, ...]:
+    """Backward-compatible device-only view of the NVML snapshot."""
+    return _read_nvml_snapshot(nvml)[0]
 
 
 def _probe_nvidia_node() -> dict:
@@ -93,9 +190,11 @@ def _probe_nvidia_node() -> dict:
     import ray
     import ray._private.thirdparty.pynvml as pynvml
 
+    devices, connections = _read_nvml_snapshot(pynvml)
     return {
         "node_id": ray.get_runtime_context().get_node_id(),
-        "devices": _read_nvml(pynvml),
+        "devices": devices,
+        "connections": connections,
     }
 
 
@@ -116,8 +215,11 @@ def discover_ray_gpu_inventory(*, timeout: float = 30) -> tuple[RayNodeInventory
     """Probe NVIDIA hardware on each live Ray node and return stable inventory.
 
     Ray's configured ``GPU`` value is used as schedulable capacity. NVML supplies
-    the model, UUID, total memory and PCI identity. Free VRAM is intentionally not
-    used as capacity because observing it does not reserve it.
+    the model, UUID, total memory, PCI identity, and pairwise intra-node
+    topology. Free VRAM is intentionally not used as capacity because observing
+    it does not reserve it. A ``None`` connection field means that NVML could not
+    report that property; zero NVLinks means it successfully found no direct
+    links between the pair.
     """
     import ray
     from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
@@ -155,6 +257,7 @@ def discover_ray_gpu_inventory(*, timeout: float = 30) -> tuple[RayNodeInventory
             resource_key=marker,
             configured_gpus=configured,
             devices=tuple(result["devices"]),
+            connections=tuple(result["connections"]),
         ))
     return tuple(sorted(inventory, key=lambda item: item.node_name))
 

@@ -10,6 +10,23 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Contribution guidance for issues, development, research evidence, testing,
   documentation, and pull requests.
+- Automatic pairwise intra-node GPU topology discovery, including normalized
+  PCI/NUMA ancestry and active direct NVLink counts.
+- A public `GPUConnection` data model and a V1.2 topology discovery guide.
+
+### Changed
+
+- Per-node Ray probes now return a complete GPU relationship graph alongside
+  the V1.1 device inventory.
+
+### Known limitations
+
+- The Ray adapter cannot yet bind a worker to a selected physical GPU UUID, so
+  discovered device-level relationships are observational and are not used in
+  placement scoring.
+- NVML may not expose a topology property on every driver and GPU; unavailable
+  relationship fields are reported as `None`.
+- NIC affinity and inter-node bandwidth or latency are not discovered.
 
 ### Planned
 
