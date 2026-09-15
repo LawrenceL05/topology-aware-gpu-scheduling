@@ -8,6 +8,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Initial KAI Scheduler object adapter with gang scheduling, GPU requests,
+  planned-node selection, queue/node-pool metadata, and preflight validation.
+- Synthetic KAI manifest example and versioned integration guide.
 - Five deterministic reference policies for GPU-count, accelerator-type,
   workload-compute, topology-only, and combined placement comparisons.
 - Machine-readable planning records and a synthetic policy comparison example.

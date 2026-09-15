@@ -103,6 +103,11 @@ now support controlled comparisons through one planner interface and the same
 Ray execution path. Run `python -m examples.compare_policies` to inspect their
 machine-readable decisions on synthetic inputs.
 
+The initial **[KAI Scheduler integration](docs/kai-integration.md)** maps the
+same backend-neutral plan to an external KAI PodGroup and node-pinned GPU Pods,
+with pure pre-submission validation that can be unit tested without a cluster.
+Run `python -m examples.kai_manifest` to inspect the synthetic object contract.
+
 On a running NVIDIA GPU cluster, V1.2 constructs planner node inputs without
 manually entering GPU models, counts or memory:
 

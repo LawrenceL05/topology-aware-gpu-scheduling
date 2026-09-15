@@ -9,10 +9,13 @@ from .inventory import (
     GPUConnection, GPUDevice, RayNodeInventory, discover_planner_nodes,
     discover_ray_gpu_inventory,
 )
+from .kai_backend import ClusterNode, KAIWorkload, build_kai_objects, validate_submission
 
 __all__ = [
-    "ExecutionRecord", "GPUConnection", "GPUDevice", "Node", "Plan",
+    "ClusterNode", "ExecutionRecord", "GPUConnection", "GPUDevice", "KAIWorkload",
+    "Node", "Plan",
     "PlanningRecord", "PolicyName", "RayNodeInventory", "RecordedExecutionError",
-    "Workload", "choose_placement", "discover_planner_nodes",
+    "Workload", "build_kai_objects", "choose_placement", "discover_planner_nodes",
     "discover_ray_gpu_inventory", "plan_with_record", "run_with_record",
+    "validate_submission",
 ]
