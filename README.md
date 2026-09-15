@@ -60,10 +60,10 @@ adds a workload-specific policy for choosing among feasible placements; Ray
 still performs resource accounting and task execution. See [Ray accelerator
 support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html).
 
-See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
-startup and GPU discovery through planning, reservation, execution, and cleanup.
-The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)** explains the new
-GPU relationship graph and its current enforcement boundary.
+See the **[V1.2 workflow](docs/v1.2-workflow.md)** for the full order from
+cluster startup and topology discovery through planning, reservation,
+execution, and cleanup. The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)**
+explains the GPU relationship fields and their current enforcement boundary.
 
 ## Evaluation
 

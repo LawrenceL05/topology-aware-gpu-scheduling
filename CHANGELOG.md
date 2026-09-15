@@ -12,7 +12,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   documentation, and pull requests.
 - Automatic pairwise intra-node GPU topology discovery, including normalized
   PCI/NUMA ancestry and active direct NVLink counts.
-- A public `GPUConnection` data model and a V1.2 topology discovery guide.
+- A public `GPUConnection` data model, a concise V1.2 workflow, and a detailed
+  topology discovery guide.
 
 ### Changed
 
