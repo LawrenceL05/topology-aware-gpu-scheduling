@@ -17,11 +17,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Automatic pairwise intra-node GPU topology discovery, including normalized
   PCI/NUMA ancestry and active direct NVLink counts.
 - A public `GPUConnection` data model and a V1.2 topology discovery guide.
+- A release-specific V1 Dynamo contract for aggregated vLLM serving with
+  independent single-GPU replicas, plus a machine-readable example and
+  container recipe.
 
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
   the V1.1 device inventory.
+- Ray is pinned to 2.55.0 because Dynamo 1.4.2's vLLM dependency requires Ray
+  2.55.0 or newer.
 
 ### Known limitations
 
@@ -34,8 +39,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Planned
 
-- NVIDIA Dynamo integration is tracked in
-  [issues 1–3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues).
+- Dynamo worker lifecycle implementation and real-GPU validation remain tracked
+  in [issues 2–3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues).
 
 ## [0.1.1] - 2026-09-14
 
