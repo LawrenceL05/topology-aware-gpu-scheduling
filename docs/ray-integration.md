@@ -88,8 +88,9 @@ automatically generated data faithful to the existing one-model-per-node
 V1.2 extends the same probe with a complete undirected graph for the GPUs on
 each node. Every pair records its closest shared PCI/NUMA ancestor and the
 number of active direct NVLinks whose remote PCI identity is the other GPU.
-See [V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics
-and limitations.
+See the [V1.2 workflow](v1.2-workflow.md) for the end-to-end order and
+[V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics and
+limitations.
 
 The collector obtains hardware topology only. Workload compute measurements,
 memory requirements, communication volume, and inter-node link bandwidth are
