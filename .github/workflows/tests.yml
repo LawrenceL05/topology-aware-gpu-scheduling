@@ -14,5 +14,6 @@ jobs:
       - run: python -m examples.plan
       - run: python -m examples.compare_policies
       - run: python -m examples.kai_manifest
+      - run: python -m examples.kai_submit --help
       - run: python -m examples.ray_smoke
       - run: python -m examples.ray_multinode_smoke

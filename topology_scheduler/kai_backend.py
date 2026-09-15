@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass
 import re
-from typing import Mapping, Sequence
+from time import monotonic, sleep
+from typing import Mapping, Protocol, Sequence
 
 from .policy import Plan
 
@@ -58,6 +59,163 @@ class ClusterNode:
     name: str
     labels: Mapping[str, str]
     allocatable_gpus: int
+
+
+@dataclass(frozen=True)
+class PodState:
+    """Small, backend-neutral view of a Kubernetes worker Pod."""
+
+    name: str
+    phase: str
+    reason: str | None = None
+    message: str | None = None
+    node_name: str | None = None
+
+
+@dataclass(frozen=True)
+class KAIStatus:
+    """Observed state of one externally managed KAI workload."""
+
+    phase: str
+    pods: tuple[PodState, ...]
+
+    def as_dict(self) -> dict:
+        return {
+            "phase": self.phase,
+            "pods": [
+                {
+                    "name": pod.name,
+                    "phase": pod.phase,
+                    "reason": pod.reason,
+                    "message": pod.message,
+                    "node_name": pod.node_name,
+                }
+                for pod in self.pods
+            ],
+        }
+
+
+class KAIClient(Protocol):
+    """Cluster operations needed by the KAI lifecycle."""
+
+    def cluster_nodes(self) -> Sequence[ClusterNode]: ...
+    def queue_exists(self, queue: str) -> bool: ...
+    def can_create(
+        self, resource: str, *, group: str = "", namespace: str | None = None
+    ) -> bool: ...
+    def create_pod_group(self, namespace: str, body: dict) -> None: ...
+    def create_pod(self, namespace: str, body: dict) -> None: ...
+    def list_pods(self, namespace: str, selector: str) -> Sequence[PodState]: ...
+    def delete_pod(self, namespace: str, name: str) -> None: ...
+    def delete_pod_group(self, namespace: str, name: str) -> None: ...
+
+
+class KubernetesKAIClient:
+    """Thin adapter over the official Kubernetes Python client APIs."""
+
+    def __init__(self, core_api, custom_api, authorization_api):
+        self.core_api = core_api
+        self.custom_api = custom_api
+        self.authorization_api = authorization_api
+
+    @classmethod
+    def from_environment(cls, *, in_cluster: bool | None = None):
+        try:
+            from kubernetes import client, config
+        except ImportError as error:
+            raise RuntimeError(
+                "Install the Kubernetes client with `pip install -e .[kai]`"
+            ) from error
+        if in_cluster is True:
+            config.load_incluster_config()
+        elif in_cluster is False:
+            config.load_kube_config()
+        else:
+            try:
+                config.load_incluster_config()
+            except config.ConfigException:
+                config.load_kube_config()
+        return cls(
+            client.CoreV1Api(), client.CustomObjectsApi(),
+            client.AuthorizationV1Api(),
+        )
+
+    def cluster_nodes(self) -> Sequence[ClusterNode]:
+        nodes = []
+        for item in self.core_api.list_node().items:
+            raw_gpus = (item.status.allocatable or {}).get("nvidia.com/gpu", 0)
+            nodes.append(ClusterNode(
+                item.metadata.name,
+                dict(item.metadata.labels or {}),
+                int(raw_gpus),
+            ))
+        return nodes
+
+    def queue_exists(self, queue: str) -> bool:
+        try:
+            self.custom_api.get_cluster_custom_object(
+                group="scheduling.run.ai", version="v2", plural="queues",
+                name=queue,
+            )
+        except Exception as error:
+            if getattr(error, "status", None) == 404:
+                return False
+            raise
+        return True
+
+    def can_create(
+        self, resource: str, *, group: str = "", namespace: str | None = None
+    ) -> bool:
+        attributes = {"verb": "create", "group": group, "resource": resource}
+        if namespace:
+            attributes["namespace"] = namespace
+        review = self.authorization_api.create_self_subject_access_review({
+            "apiVersion": "authorization.k8s.io/v1",
+            "kind": "SelfSubjectAccessReview",
+            "spec": {"resourceAttributes": attributes},
+        })
+        return bool(review.status.allowed)
+
+    def create_pod_group(self, namespace: str, body: dict) -> None:
+        self.custom_api.create_namespaced_custom_object(
+            group="scheduling.run.ai", version="v2alpha2", namespace=namespace,
+            plural="podgroups", body=body,
+        )
+
+    def create_pod(self, namespace: str, body: dict) -> None:
+        self.core_api.create_namespaced_pod(namespace=namespace, body=body)
+
+    def list_pods(self, namespace: str, selector: str) -> Sequence[PodState]:
+        result = self.core_api.list_namespaced_pod(
+            namespace=namespace, label_selector=selector,
+        )
+        return [
+            PodState(
+                item.metadata.name,
+                item.status.phase or "Unknown",
+                item.status.reason,
+                item.status.message,
+                item.spec.node_name,
+            )
+            for item in result.items
+        ]
+
+    def delete_pod(self, namespace: str, name: str) -> None:
+        try:
+            self.core_api.delete_namespaced_pod(name=name, namespace=namespace)
+        except Exception as error:
+            if getattr(error, "status", None) != 404:
+                raise
+
+    def delete_pod_group(self, namespace: str, name: str) -> None:
+        try:
+            self.custom_api.delete_namespaced_custom_object(
+                group="scheduling.run.ai", version="v2alpha2",
+                namespace=namespace, plural="podgroups", name=name,
+            )
+        except Exception as error:
+            if getattr(error, "status", None) != 404:
+                raise
 
 
 def validate_submission(
@@ -169,3 +327,112 @@ def build_kai_objects(plan: Plan, workload: KAIWorkload) -> list[dict]:
             },
         })
     return objects
+
+
+def preflight(plan: Plan, workload: KAIWorkload, client: KAIClient) -> None:
+    """Read live cluster state and validate the complete submission contract."""
+    validate_submission(
+        plan, workload, client.cluster_nodes(),
+        queue_exists=client.queue_exists(workload.queue),
+        can_create_pods=client.can_create("pods", namespace=workload.namespace),
+        can_create_podgroups=client.can_create(
+            "podgroups", group="scheduling.run.ai",
+            namespace=workload.namespace,
+        ),
+    )
+
+
+def submit(plan: Plan, workload: KAIWorkload, client: KAIClient) -> KAIStatus:
+    """Validate and create the PodGroup before its worker Pods."""
+    preflight(plan, workload, client)
+    pod_group, *pods = build_kai_objects(plan, workload)
+    created_pods = []
+    client.create_pod_group(workload.namespace, pod_group)
+    try:
+        for pod in pods:
+            client.create_pod(workload.namespace, pod)
+            created_pods.append(pod["metadata"]["name"])
+        return status(workload, client, expected_workers=len(plan.workers))
+    except Exception:
+        for name in reversed(created_pods):
+            client.delete_pod(workload.namespace, name)
+        client.delete_pod_group(workload.namespace, workload.name)
+        raise
+
+
+def status(
+    workload: KAIWorkload, client: KAIClient, *, expected_workers: int | None = None
+) -> KAIStatus:
+    """Collapse worker Pod phases into one workload phase."""
+    pods = tuple(client.list_pods(
+        workload.namespace, f"app.kubernetes.io/name={workload.name}"
+    ))
+    phases = {pod.phase for pod in pods}
+    if "Failed" in phases:
+        phase = "failed"
+    elif (
+        pods and phases == {"Succeeded"}
+        and (expected_workers is None or len(pods) == expected_workers)
+    ):
+        phase = "succeeded"
+    elif "Running" in phases or "Succeeded" in phases:
+        phase = "running"
+    else:
+        phase = "pending"
+    return KAIStatus(phase, pods)
+
+
+def cancel(
+    workload: KAIWorkload, client: KAIClient, *, worker_count: int | None = None
+) -> None:
+    """Delete worker Pods first, then the externally managed PodGroup."""
+    if worker_count is None:
+        pod_names = [
+            pod.name for pod in client.list_pods(
+                workload.namespace, f"app.kubernetes.io/name={workload.name}"
+            )
+        ]
+    else:
+        pod_names = [f"{workload.name}-{rank}" for rank in range(worker_count)]
+    for name in reversed(pod_names):
+        client.delete_pod(workload.namespace, name)
+    client.delete_pod_group(workload.namespace, workload.name)
+
+
+cleanup = cancel
+
+
+def run(
+    plan: Plan, workload: KAIWorkload, *, client: KAIClient,
+    timeout_s: float = 600, poll_interval_s: float = 1,
+    cleanup_on_finish: bool = True, clock=monotonic, sleeper=sleep,
+) -> KAIStatus:
+    """Submit, wait for a terminal phase, and clean up external objects."""
+    if timeout_s <= 0:
+        raise ValueError("timeout_s must be positive")
+    if poll_interval_s < 0:
+        raise ValueError("poll_interval_s cannot be negative")
+    submitted = False
+    try:
+        current = submit(plan, workload, client)
+        submitted = True
+        deadline = clock() + timeout_s
+        while current.phase not in ("succeeded", "failed"):
+            if clock() >= deadline:
+                raise TimeoutError(
+                    f"KAI workload {workload.name!r} did not finish in {timeout_s}s"
+                )
+            sleeper(poll_interval_s)
+            current = status(
+                workload, client, expected_workers=len(plan.workers)
+            )
+        if current.phase == "failed":
+            failed = [
+                f"{pod.name}: {pod.reason or pod.message or pod.phase}"
+                for pod in current.pods if pod.phase == "Failed"
+            ]
+            raise RuntimeError("KAI workload failed: " + "; ".join(failed))
+        return current
+    finally:
+        if submitted and cleanup_on_finish:
+            cancel(workload, client, worker_count=len(plan.workers))

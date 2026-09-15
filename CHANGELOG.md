@@ -10,6 +10,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial KAI Scheduler object adapter with gang scheduling, GPU requests,
   planned-node selection, queue/node-pool metadata, and preflight validation.
+- KAI Kubernetes client lifecycle for live discovery and RBAC checks, ordered
+  submission, status polling, cancellation, rollback, timeout, and cleanup.
+- Named `ray` and `kai` backend selection with backend identity in execution
+  records, a live KAI smoke example, and deployable RBAC manifests.
 - Synthetic KAI manifest example and versioned integration guide.
 - Five deterministic reference policies for GPU-count, accelerator-type,
   workload-compute, topology-only, and combined placement comparisons.

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from topology_scheduler import (
     Node, PolicyName, RecordedExecutionError, Workload, choose_placement,
@@ -114,6 +115,7 @@ class BaselinePolicyTests(unittest.TestCase):
             )
             self.assertEqual(results, [0, 1])
             self.assertEqual(execution.status, "succeeded")
+            self.assertEqual(execution.backend, "backend")
             self.assertIn("execution_started_ns", execution.as_dict()["timing"])
         self.assertEqual([name for name, _ in seen], [item.value for item in PolicyName])
 
@@ -131,6 +133,36 @@ class BaselinePolicyTests(unittest.TestCase):
         value = caught.exception.record.as_dict()
         self.assertEqual(value["status"], "failed")
         self.assertEqual(value["error"], "TimeoutError: reservation timed out")
+
+    def test_named_backend_validation_is_actionable(self):
+        plan, planning = plan_with_record(
+            self.nodes, self.workload, self.bandwidth,
+            policy=PolicyName.GPU_COUNT,
+        )
+        with self.assertRaisesRegex(ValueError, "'ray', 'kai'"):
+            run_with_record(plan, planning, None, backend="unknown")
+
+    def test_every_policy_can_use_named_kai_backend(self):
+        kai_workload = object()
+        with patch(
+            "topology_scheduler.kai_backend.run", return_value="complete"
+        ) as selected:
+            for policy in PolicyName:
+                options = (
+                    {"accelerator_type": "X"}
+                    if policy is PolicyName.ACCELERATOR_TYPE else {}
+                )
+                plan, planning = plan_with_record(
+                    self.nodes, self.workload, self.bandwidth,
+                    policy=policy, **options,
+                )
+                result, execution = run_with_record(
+                    plan, planning, kai_workload,
+                    backend="kai", client="client",
+                )
+                self.assertEqual(result, "complete")
+                self.assertEqual(execution.backend, "kai")
+        self.assertEqual(selected.call_count, len(PolicyName))
 
 
 if __name__ == "__main__":
