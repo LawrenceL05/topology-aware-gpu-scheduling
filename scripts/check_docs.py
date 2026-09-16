@@ -16,7 +16,11 @@ from urllib.parse import unquote, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INLINE = re.compile(r"\[[^\]\n]*\]\(\s*(<[^>]+>|[^\s)]+)(?:\s+\"[^\"]*\")?\s*\)")
+INLINE = re.compile(
+    r"(?<!\\)!?\[[^\]\n]*\]\(\s*"
+    r"(<[^>\n]+>|(?:\\.|[^()\s]|\([^()\n]*\))+?)"
+    r"(?:\s+(?:\"[^\"]*\"|'[^']*'))?\s*\)"
+)
 DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:\s*(<[^>]+>|\S+)", re.MULTILINE)
 REFERENCE = re.compile(r"\[([^\]\n]+)\]\[([^\]\n]*)\]")
 # Explicitly approved commands: never execute arbitrary Markdown as shell code.
@@ -68,32 +72,56 @@ def check_links(root, document):
     return errors
 
 
+def required_value(text, pattern, source, label, errors):
+    """Extract required metadata while keeping failures actionable."""
+    match = re.search(pattern, text, re.MULTILINE)
+    if match is None:
+        errors.append(f"{source}: could not determine {label}")
+        return None
+    return match[1]
+
+
 def check_versions(root):
     """Keep the shared summary tied to project metadata and runtime contracts."""
     project = (root / "pyproject.toml").read_text(encoding="utf-8")
     runtime = json.loads((root / "deploy/dynamo-v1/contract.json").read_text())["runtime"]
     kai = (root / "topology_scheduler/kai_backend.py").read_text(encoding="utf-8")
+    errors = []
     expected = {
-        "Package (development)": re.search(r'^version = "([^"]+)"', project, re.M)[1],
-        "Ray (exact dependency)": runtime["ray"],
-        "Dynamo (contract only)": runtime["dynamo"],
-        "vLLM (contract only)": runtime["vllm"],
-        "Python (Dynamo image / CI)": runtime["python"],
-        "CUDA (Dynamo image)": runtime["cuda"],
-        "Minimum NVIDIA driver (Dynamo)": runtime["minimum_nvidia_driver"],
-        "Kubernetes Python client (optional dependency)": re.search(r'kai = \["([^"]+)"\]', project)[1],
+        "Package (development)": required_value(
+            project, r'^version = "([^"]+)"', "pyproject.toml",
+            "package version", errors),
+        "Kubernetes Python client (optional dependency)": required_value(
+            project, r'kai = \["([^"]+)"\]', "pyproject.toml",
+            "Kubernetes client dependency", errors),
     }
+    for label, key in (
+        ("Ray (exact dependency)", "ray"),
+        ("Dynamo (contract only)", "dynamo"),
+        ("vLLM (contract only)", "vllm"),
+        ("Python (Dynamo image / CI)", "python"),
+        ("CUDA (Dynamo image)", "cuda"),
+        ("Minimum NVIDIA driver (Dynamo)", "minimum_nvidia_driver"),
+    ):
+        expected[label] = runtime.get(key)
+        if expected[label] is None:
+            errors.append(f"deploy/dynamo-v1/contract.json: missing runtime.{key}")
     for label, constant in (
         ("KAI Scheduler (target)", "KAI_VERSION"),
         ("Kubernetes (target)", "KUBERNETES_VERSION"),
         ("GPU Operator (target)", "GPU_OPERATOR_VERSION"),
     ):
-        expected[label] = re.search(rf'^{constant} = "([^"]+)"', kai, re.M)[1]
+        expected[label] = required_value(
+            kai, rf'^{constant} = "([^"]+)"',
+            "topology_scheduler/kai_backend.py", constant, errors)
     summary = (root / "docs/current-status.md").read_text(encoding="utf-8")
-    errors = [f"docs/current-status.md: expected '| {label} | `{value}` |'"
-              for label, value in expected.items()
-              if f"| {label} | `{value}` |" not in summary]
-    if f'ray=={runtime["ray"]}' not in project:
+    errors.extend(
+        f"docs/current-status.md: expected '| {label} | `{value}` |'"
+        for label, value in expected.items()
+        if value is not None and f"| {label} | `{value}` |" not in summary
+    )
+    if expected["Ray (exact dependency)"] is not None and \
+            f'ray=={expected["Ray (exact dependency)"]}' not in project:
         errors.append("pyproject.toml: Ray pin differs from the Dynamo contract")
     return errors
 

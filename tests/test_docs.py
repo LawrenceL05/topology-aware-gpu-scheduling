@@ -30,6 +30,14 @@ class DocumentationTests(unittest.TestCase):
             '[full][target] [target][]\n[target]: <../a file.md>\n'
         ), [])
 
+    def test_inline_links_support_parentheses_and_titles(self):
+        (self.root / "guide(v1).md").touch()
+        self.assertEqual(self.links(
+            '[double](../guide(v1).md "Guide")\n'
+            "[single](../guide(v1).md 'Guide')\n"
+            '![image-like](../guide(v1).md)\n'
+        ), [])
+
     def test_missing_files_and_undefined_references_fail(self):
         errors = self.links('[missing](missing.md) [bad][absent]\n[x]: missing.png')
         self.assertEqual(len(errors), 3)
@@ -60,6 +68,16 @@ class DocumentationTests(unittest.TestCase):
         guide = self.root / 'docs/current-status.md'
         guide.write_text(guide.read_text().replace('`2.55.0`', '`0.0.0`'))
         self.assertTrue(any('Ray (exact dependency)' in e for e in check_versions(self.root)))
+
+    def test_missing_version_metadata_is_reported_without_crashing(self):
+        self.copy_contract_files()
+        project = self.root / 'pyproject.toml'
+        project.write_text(project.read_text().replace('version = "0.1.2"', ''))
+        kai = self.root / 'topology_scheduler/kai_backend.py'
+        kai.write_text(kai.read_text().replace('KAI_VERSION = "0.17.0"', ''))
+        errors = check_versions(self.root)
+        self.assertTrue(any('package version' in error for error in errors))
+        self.assertTrue(any('KAI_VERSION' in error for error in errors))
 
     def test_unapproved_command_is_rejected(self):
         self.copy_contract_files()
