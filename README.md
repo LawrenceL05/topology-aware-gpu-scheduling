@@ -82,7 +82,9 @@ are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
-propose scheduler changes, run validation, and prepare a pull request.
+propose scheduler changes, run validation, and prepare a pull request. See the
+**[release process](docs/releasing.md)** for how a version number, changelog
+section, annotated tag, and GitHub Release are produced.
 
 ## Ray Source and Runnable Integration
 

@@ -47,6 +47,9 @@ published release. See [current status and validation](docs/current-status.md).
   container recipe
   ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9));
   the worker lifecycle and GPU inference validation remain planned.
+- A documented release process covering semantic-versioning rules, a release
+  checklist, annotated `vX.Y.Z` tags, release-note contents, and rollback and
+  tag-correction rules; no tag or release is published by it.
 
 ### Changed
 
