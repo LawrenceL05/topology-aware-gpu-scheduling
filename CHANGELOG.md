@@ -13,8 +13,7 @@ published release. See [current status and validation](docs/current-status.md).
 
 - Documentation update rules, PR checklist, shared status/version summary, and
   GPU-free CI checks for local documentation links and approved examples
-  ([issue #19](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/19);
-  implementation PR link to be added when this PR is opened).
+  ([PR #22](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/22)).
 
 - Initial KAI Scheduler object adapter with gang scheduling, GPU requests,
   planned-node selection, queue/node-pool metadata, and preflight validation
