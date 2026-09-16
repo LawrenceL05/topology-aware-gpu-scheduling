@@ -1,7 +1,11 @@
 # V1 Ray, Dynamo, and vLLM integration contract
 
+See [current implementation, validation status, and versions](current-status.md)
+for the shared support summary and evidence boundaries.
+
 This document fixes the architecture and runtime for the first Dynamo
-milestone. V1 uses Ray to reserve GPUs and own long-lived worker processes,
+milestone. The worker lifecycle is planned, not implemented. In that design,
+V1 will use Ray to reserve GPUs and own long-lived worker processes,
 Dynamo to register and route serving endpoints, and vLLM to execute the model.
 It preserves the existing planner and finite-task adapter.
 
@@ -45,7 +49,8 @@ container requirement, and Docker base image stay synchronized.
 
 The 10 GB Dynamo image has not been pulled and no NVIDIA GPU inference run has
 been performed for this contract. Image build and real-GPU service evidence
-belong to issue 3; this milestone does not present them as completed.
+belong to [issue #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3);
+this milestone does not present them as completed.
 
 ## Deployment shape
 
@@ -88,8 +93,8 @@ the adapter to create replicas. The caller also supplies model credentials at
 runtime when needed. These shared services survive an individual placement
 attempt.
 
-The new adapter in issue 2 will own the Ray placement group, one long-lived Ray
-actor per replica, each actor's `dynamo.vllm` child process, and the worker log
+The new adapter in [issue #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2)
+will own the Ray placement group, one long-lived Ray actor per replica, each actor's `dynamo.vllm` child process, and the worker log
 files. It must never stop caller-owned infrastructure or the frontend.
 
 Workers register with Dynamo using the shared namespace, discovery backend, and

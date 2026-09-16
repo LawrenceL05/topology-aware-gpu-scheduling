@@ -1,5 +1,8 @@
 # Topology and Workload Aware GPU Scheduling
 
+See [current implementation, validation status, and versions](docs/current-status.md)
+for the shared support summary and evidence boundaries.
+
 Research on GPU scheduling for distributed large language model (LLM) inference across heterogeneous GPU clusters using **Ray**, **KAI Scheduler** and **NVIDIA Dynamo**.
 
 ## Overview
