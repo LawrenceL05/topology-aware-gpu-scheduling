@@ -6,34 +6,57 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Package `0.1.2` is in development; V1.2 names the topology milestone, not a
+published release. See [current status and validation](docs/current-status.md).
+
 ### Added
 
+- Documentation update rules, PR checklist, shared status/version summary, and
+  GPU-free CI checks for local documentation links and approved examples
+  ([issue #19](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/19);
+  implementation PR link to be added when this PR is opened).
+
 - Initial KAI Scheduler object adapter with gang scheduling, GPU requests,
-  planned-node selection, queue/node-pool metadata, and preflight validation.
+  planned-node selection, queue/node-pool metadata, and preflight validation
+  ([PR #12](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/12)).
 - KAI Kubernetes client lifecycle for live discovery and RBAC checks, ordered
-  submission, status polling, cancellation, rollback, timeout, and cleanup.
+  submission, status polling, cancellation, rollback, timeout, and cleanup
+  ([PR #13](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/13)).
 - Named `ray` and `kai` backend selection with backend identity in execution
-  records, a live KAI smoke example, and deployable RBAC manifests.
-- Synthetic KAI manifest example and versioned integration guide.
+  records, a live KAI smoke example, and deployable RBAC manifests
+  ([PR #13](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/13));
+  a physical KAI/GPU cluster run is not yet recorded.
+- Synthetic KAI manifest example and versioned integration guide
+  ([PR #12](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/12)).
 - Five deterministic reference policies for GPU-count, accelerator-type,
-  workload-compute, topology-only, and combined placement comparisons.
-- Machine-readable planning records and a synthetic policy comparison example.
-- Controlled normalized-JCT comparison guidance.
+  workload-compute, topology-only, and combined placement comparisons
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
+- Machine-readable planning records and a synthetic policy comparison example
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
+- Controlled normalized-JCT comparison guidance
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
 - Contribution guidance for issues, development, research evidence, testing,
-  documentation, and pull requests.
+  documentation, and pull requests
+  ([commit 6468116](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/6468116)).
 - Automatic pairwise intra-node GPU topology discovery, including normalized
-  PCI/NUMA ancestry and active direct NVLink counts.
-- A public `GPUConnection` data model and a V1.2 topology discovery guide.
+  PCI/NUMA ancestry and active direct NVLink counts
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
+- A public `GPUConnection` data model and a V1.2 topology discovery guide
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
 - A release-specific V1 Dynamo contract for aggregated vLLM serving with
   independent single-GPU replicas, plus a machine-readable example and
-  container recipe.
+  container recipe
+  ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9));
+  the worker lifecycle and GPU inference validation remain planned.
 
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
-  the V1.1 device inventory.
+  the V1.1 device inventory
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
 - Ray is pinned to 2.55.0 because Dynamo 1.4.2's vLLM dependency requires Ray
-  2.55.0 or newer.
+  2.55.0 or newer
+  ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9)).
 
 ### Known limitations
 
@@ -47,9 +70,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Planned
 
 - Dynamo worker lifecycle implementation and real-GPU validation remain tracked
-  in [issues 2–3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues).
+  in [issue #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2)
+  and [issue #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3).
 
 ## [0.1.1] - 2026-09-14
+
+Source: [tagged commit 9dcb40f](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/9dcb40f13d2d836a444ab0ddabfd53d03ba31266).
 
 ### Added
 
@@ -80,6 +106,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - NVIDIA Dynamo integration is not implemented in this release.
 
 ## [0.1.0] - 2026-09-13
+
+Source: [tagged commit 4db520f](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/4db520f6343fcc4e7ecee086a811328ddee6bbc9).
 
 ### Added
 
