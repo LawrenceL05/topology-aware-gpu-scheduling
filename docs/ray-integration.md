@@ -1,5 +1,8 @@
 # Ray integration and source guide
 
+See [current implementation, validation status, and versions](current-status.md)
+for the shared support summary and evidence boundaries.
+
 ## Full Ray source
 
 Browse **[all Ray source code](https://github.com/ray-project/ray)**, or the
