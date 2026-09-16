@@ -1,15 +1,9 @@
 # KAI Scheduler integration
 
-See [current implementation, validation status, and versions](current-status.md)
-for the shared support summary and evidence boundaries.
-
-[Issue #6](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/6)
-added a second execution backend for the same backend-neutral `Plan` used by Ray. The implementation targets KAI Scheduler 0.17.0, Kubernetes 1.34,
+Issue #6 adds a second execution backend for the same backend-neutral `Plan`
+used by Ray. The implementation targets KAI Scheduler 0.17.0, Kubernetes 1.34,
 and NVIDIA GPU Operator 25.10. Validate that combination in a test cluster
 before using it for experiments.
-
-The lifecycle is implemented and covered by mocked Kubernetes tests and
-synthetic manifests. A real KAI/GPU cluster run has not been recorded.
 
 ## Workflow
 
@@ -49,10 +43,9 @@ gang. Every Pod:
 Separate Pods preserve a plan that assigns different ranks to different nodes;
 a single Kubernetes Job template cannot express that mapping.
 
-Device UUID, PCI, NUMA, and NVLink facts discovered by V1.2 remain
-observational inventory; individual GPU relationships do not feed the current
-node-level placement score. Kubernetes node selection chooses a node but does
-not bind a rank to a specific GPU UUID on that node.
+Device UUID, PCI, NUMA, and NVLink facts discovered by V1.2 remain planner
+inputs. Kubernetes node selection chooses a node but does not bind a rank to a
+specific GPU UUID on that node.
 
 ## Selecting Ray or KAI
 
