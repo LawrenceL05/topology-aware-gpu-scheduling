@@ -51,10 +51,15 @@ on physical hardware for changes involving NVML, CUDA, topology, or inference.
    behavioral changes.
 3. Add or update tests that demonstrate the behavior being changed.
 4. Update the README or detailed documentation when commands, public APIs,
-   assumptions, or limitations change.
-5. Add a concise entry under `Unreleased` in `CHANGELOG.md` for user-visible
+   assumptions, supported backends, validation evidence, or limitations
+   change. Keep planned, simulated, and real-hardware-validated behavior
+   clearly distinct.
+5. Check changed documentation links and commands before opening the pull
+   request. Do not leave a command in the documentation that no longer runs
+   with the supported dependency versions.
+6. Add a concise entry under `Unreleased` in `CHANGELOG.md` for user-visible
    features, fixes, and compatibility changes.
-6. Run the relevant test and example commands before opening a pull request.
+7. Run the relevant test and example commands before opening a pull request.
 
 Do not commit models, datasets, benchmark outputs, credentials, cluster
 addresses, or generated environments. Link to reproducible external artifacts
@@ -86,8 +91,13 @@ Before requesting review, confirm that:
 
 - tests and relevant examples pass;
 - new behavior has meaningful test coverage;
-- public behavior and limitations are documented;
-- user-visible changes appear in `CHANGELOG.md`; and
+- public behavior, validation scope, and limitations are documented;
+- planned, simulated, and real-hardware-validated behavior are labeled
+  accurately;
+- documentation links and documented commands affected by the change have
+  been checked;
+- user-visible changes appear in `CHANGELOG.md` (or the pull request explains
+  why no changelog entry is needed); and
 - the pull request contains no secrets or unrelated generated files.
 
 Reviewers may request smaller scope, additional evidence, or a design issue for
