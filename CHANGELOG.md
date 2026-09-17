@@ -50,10 +50,13 @@ published release. See [current status and validation](docs/current-status.md).
 - Opt-in directional TCP throughput and round-trip latency measurement between
   live Ray nodes, with bounded probe parameters, per-direction records and
   diagnostics, JSON reuse under an explicit maximum age, and normalization into
-  the planner's bandwidth map; tested with mocks, loopback sockets, and two Ray
-  nodes on one host, not on a physical cluster.
+  the planner's bandwidth map
+  ([PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27));
+  tested with mocks, loopback sockets, and two Ray nodes on one host, not on a
+  physical cluster.
 - Planning records now state whether each bandwidth value was measured,
-  advertised, a fallback, or supplied by the caller.
+  advertised, a fallback, or supplied by the caller
+  ([PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27)).
 
 ### Changed
 
