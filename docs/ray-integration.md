@@ -205,7 +205,9 @@ not an enforced memory reservation.
 For tensor-parallel inference, add model loading, rank rendezvous, collective
 communication and engine lifecycle handling in an appropriate worker/actor
 layer. The [V1 Dynamo contract](dynamo-v1-contract.md) fixes that layer's first
-runtime and ownership boundary; the worker lifecycle is not implemented yet.
+runtime and ownership boundary; the [lifecycle adapter](dynamo-lifecycle.md)
+implements independent TP=1 replicas with CPU/fake-engine coverage. Real
+Dynamo/GPU serving remains unverified.
 No H100/B200 cluster experiment or improvement claim is included. Compare
 policies on matched traces and real hardware; report queue
 wait and execution boundaries, failures, utilization, and the chosen normalized
