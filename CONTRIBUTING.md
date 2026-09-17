@@ -21,6 +21,15 @@ Feature requests should describe the scheduling problem, proposed behavior,
 and how success could be measured. Use GitHub Discussions or an issue for design
 questions rather than opening an incomplete implementation.
 
+Use the [project roadmap](docs/roadmap.md) when proposing and triaging work.
+Every implementation or evaluation issue needs a milestone, or an explicit
+reason and next triage step recorded in the issue. Choose by the primary
+deliverable, link dependencies, and keep task requirements and progress on the
+issue. Completed research work enters a release through a linked readiness
+issue in Next Release; it keeps its original research milestone. Maintainers
+review completion evidence before closing milestones and set due dates only
+when estimates, hardware availability, and dependencies justify them.
+
 ## Set up the project
 
 Python 3.10 or newer is required. From a clone of the repository:
