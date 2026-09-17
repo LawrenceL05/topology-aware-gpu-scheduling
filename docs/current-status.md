@@ -21,7 +21,8 @@ No real GPU cluster or inference benchmark evidence is recorded here.
 | V1.1 inventory and V1.2 intra-node topology | Implemented; mocked NVML tests | [Inventory tests](../tests/test_inventory.py); physical NVML validation remains outstanding. GPU edges are observational, not scoring inputs or UUID enforcement. |
 | KAI object and lifecycle adapter | Implemented; mocked Kubernetes tests and synthetic manifests | [KAI tests](../tests/test_kai_backend.py), [manifest example](../examples/kai_manifest.py); live-cluster admission, execution, and cleanup need validation. |
 | Dynamo V1 | Contract and environment recipe implemented; worker lifecycle planned | [Contract tests](../tests/test_dynamo_contract.py), [contract](dynamo-v1-contract.md); [worker lifecycle #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2) and [GPU validation #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3) remain open. |
-| GPU-to-NIC affinity and inter-node discovery | Planned | [NIC inventory #14](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/14), [NUMA/NIC mapping #15](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/15), [affinity graph #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16), [network measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17). |
+| GPU, NUMA, and NIC host locality | Implemented; fixture-based unit tests and a real-sysfs check on a Linux host without GPUs | [Host topology tests](../tests/test_host_topology.py), [example](../examples/host_topology.py), [guide](host-topology.md); no physical multi-socket GPU host has been mapped, and proximity is structural, not measured. |
+| NIC inventory, affinity graph, and inter-node discovery | Planned | [NIC inventory #14](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/14), [affinity graph #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16), [network measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17). Host locality reads interfaces from sysfs directly until #14 lands. |
 
 ## Versions
 
@@ -61,6 +62,7 @@ the version table above, and this explicit list of CPU-safe commands:
 ```bash
 python -m examples.plan
 python -m examples.compare_policies
+python -m examples.host_topology
 python -m examples.kai_manifest
 python -m examples.kai_submit --help
 ```
