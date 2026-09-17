@@ -47,6 +47,13 @@ published release. See [current status and validation](docs/current-status.md).
   container recipe
   ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9));
   the worker lifecycle and GPU inference validation remain planned.
+- Opt-in directional TCP throughput and round-trip latency measurement between
+  live Ray nodes, with bounded probe parameters, per-direction records and
+  diagnostics, JSON reuse under an explicit maximum age, and normalization into
+  the planner's bandwidth map; tested with mocks, loopback sockets, and two Ray
+  nodes on one host, not on a physical cluster.
+- Planning records now state whether each bandwidth value was measured,
+  advertised, a fallback, or supplied by the caller.
 
 ### Changed
 
@@ -64,7 +71,10 @@ published release. See [current status and validation](docs/current-status.md).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- NIC affinity and inter-node bandwidth or latency are not discovered.
+- NIC inventory and GPU-to-NIC affinity are not discovered. Link measurement
+  resolves a probe's interface and advertised speed on Linux IPv4 only.
+- Link measurement covers TCP over each node's Ray address. It is not RDMA,
+  GPUDirect RDMA, or NCCL throughput, and the cost model does not use RTT.
 
 ### Planned
 
