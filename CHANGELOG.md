@@ -58,7 +58,9 @@ published release. See [current status and validation](docs/current-status.md).
 - GPU to NUMA and nearest-NIC mapping read from host sysfs on each Ray node,
   with PCI ancestry, per-interface proximity and its evidence, explicit unknown
   states with diagnostics, stable ordering and serialization, and a runnable
-  example; proximity is structural and is not a bandwidth claim.
+  example
+  ([PR #29](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/29));
+  proximity is structural and is not a bandwidth claim.
 
 ### Changed
 
