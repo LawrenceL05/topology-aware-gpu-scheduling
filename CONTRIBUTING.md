@@ -111,8 +111,8 @@ For a new PR, add its link once GitHub assigns the number; before release,
 verify the PR is merged and included in the release, or use an immutable merged
 commit link. An issue describes intent and does not prove implementation.
 Keep planned work in a separate Planned section linked to its open issue.
-New release/tag policy is tracked separately in
-[issue #20](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/20).
+Release, versioning, and tag policy lives in
+[the release process](docs/releasing.md).
 
 ## Research and benchmark changes
 
@@ -146,6 +146,17 @@ Before requesting review, confirm that:
 
 Reviewers may request smaller scope, additional evidence, or a design issue for
 changes that affect placement semantics or experimental conclusions.
+
+## Releases
+
+Releases follow [the release process](docs/releasing.md). It defines the
+semantic-versioning rules for this project, the checklist that must pass before
+a tag, the annotated `vX.Y.Z` tag format and GitHub Release, the required
+contents of release notes, and the rollback rules for a bad release.
+
+Contributors do not create tags. A correct entry under `Unreleased` in
+`CHANGELOG.md` is what makes a change releasable; a maintainer decides the
+version and publishes.
 
 ## Upstream changes
 
