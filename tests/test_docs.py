@@ -99,7 +99,7 @@ class DocumentationTests(unittest.TestCase):
         with patch('sys.argv', ['check_docs.py', '--run-examples']), \
              patch('scripts.check_docs.subprocess.run') as run:
             self.assertEqual(main(), 0)
-            self.assertEqual(run.call_count, 4)
+            self.assertEqual(run.call_count, 5)
             for call in run.call_args_list:
                 self.assertEqual(call.kwargs['timeout'], 60)
                 self.assertFalse(call.kwargs.get('shell', False))

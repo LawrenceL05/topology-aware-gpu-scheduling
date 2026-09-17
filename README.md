@@ -67,6 +67,11 @@ See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
 startup and GPU discovery through planning, reservation, execution, and cleanup.
 The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)** explains the new
 GPU relationship graph and its current enforcement boundary.
+The **[typed topology graph](docs/topology-graph.md)** adds GPU, NIC, NUMA, and
+node entities with separate evidence-bearing relationships and affinity queries.
+Run `python -m examples.topology_graph` for a synthetic, GPU-free example.
+Automatic NIC/affinity collectors remain separate work; graph queries do not
+change planner scores or bind devices in Ray or KAI.
 
 ## Evaluation
 
