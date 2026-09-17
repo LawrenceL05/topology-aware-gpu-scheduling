@@ -13,7 +13,7 @@ published release. See [current status and validation](docs/current-status.md).
 
 - A project roadmap defining topology, Dynamo, evaluation, and release-readiness
   milestones, issue triage, dependencies, exit criteria, and maintainer setup
-  ([issue #18](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/18)).
+  ([PR #26](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/26)).
 - Documentation update rules, PR checklist, shared status/version summary, and
   GPU-free CI checks for local documentation links and approved examples
   ([PR #22](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/22)).
