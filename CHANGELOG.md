@@ -11,6 +11,11 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Added
 
+- A typed GPU/NIC/NUMA/node graph with evidence-bearing relationships,
+  deterministic serialization, legacy GPU inventory loading, affinity queries,
+  and a synthetic CPU example. Automatic NIC/affinity discovery and backend
+  device binding remain separate work
+  ([issue #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16)).
 - A project roadmap defining topology, Dynamo, evaluation, and release-readiness
   milestones, issue triage, dependencies, exit criteria, and maintainer setup
   ([PR #26](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/26)).

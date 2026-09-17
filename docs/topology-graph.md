@@ -1,0 +1,146 @@
+# Typed topology graph
+
+`TopologyGraph` represents GPU, NIC, NUMA, and node entities with separate
+NVLink, PCI/NUMA ancestry, NUMA membership, and GPU-to-NIC affinity relationships.
+It does not collapse those observations into one numeric distance or cost.
+
+The graph API and CPU example are implemented. Automatic NIC discovery
+([#14](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/14))
+and GPU/NUMA/NIC derivation
+([#15](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/15))
+remain separate, unfinished collectors. Their outputs can populate this model;
+this change adds neither collector nor claims real-cluster validation.
+
+## API and stable identities
+
+The public API imports from `topology_scheduler` without Ray, Kubernetes, or
+NVML. [topology.py](../topology_scheduler/topology.py) defines `TopologyVertex`,
+`TopologyRelationship`, `TopologyGraph`, and the read-only `RELATIONSHIP_TYPES`
+mapping of direction, unit, and meaning.
+
+`TopologyVertex(kind, node_id, key, attributes={})` derives IDs from these keys.
+Components are percent-encoded so delimiters inside them cannot cause collisions.
+
+| Kind | Collector-supplied key | ID |
+| --- | --- | --- |
+| `node` | Same as `node_id` | `node:<node_id>` |
+| `gpu` | GPU UUID | `node:<node_id>/gpu:<uuid>` |
+| `nic` | Stable node-local interface identity including port | `node:<node_id>/nic:<key>` |
+| `numa` | Canonical nonnegative decimal NUMA number | `node:<node_id>/numa:<number>` |
+
+For NICs, a collector can use a normalized PCI function plus physical port,
+such as `pci:0000:02:00.0/port:1`. Multiple ports need distinct keys. Virtual or
+unidentified interfaces need a stable source identity documented by their
+collector; the graph never invents array-index keys. Store interface name,
+MAC/PCI address, advertised speed with units, and diagnostics in `attributes`.
+Unavailable values remain `null`; NUMA `-1` must not create a fictitious domain.
+
+IDs are stable for unchanged node identity and device keys, even if a GPU's
+local index changes. The legacy adapter uses Ray node IDs, so identity is
+scoped to a Ray node's lifetime, not guaranteed across restarts or hardware
+replacement. Every device/domain needs an owning node vertex. Duplicate IDs,
+dangling endpoints, and cross-node edges of these intra-node types are rejected.
+
+## Relationship schema
+
+Every edge has `kind`, `source`, `target`, `value`, `state`, `discovery_source`,
+`confidence`, `evidence`, and `reason`. Serialized edges also contain
+`directed`, `unit`, and `meaning`, checked against `RELATIONSHIP_TYPES` on load.
+
+| Kind | Endpoints / direction | Known value / unit |
+| --- | --- | --- |
+| `contains` | Node to GPU, NIC, or NUMA; directed | `null`; no unit, structural membership |
+| `nvlink` | GPU pair; undirected | Nonnegative integer; `links`, not bandwidth |
+| `pcie_ancestry` | Pair of GPU/NIC devices; undirected | Source's nonempty ancestry label; `category` |
+| `numa_locality` | GPU or NIC to NUMA domain; directed | `local`; `category` |
+| `gpu_nic_affinity` | GPU and NIC; undirected | Proximity label below; `category` |
+
+`evidence` retains JSON values, nested raw records, source paths, endpoint
+identities, and diagnostics supplied by the collector. `discovery_source` names
+the observation/derivation method and must not be empty. Confidence is `high`,
+`medium`, `low`, or `unknown`: a source assessment, not a graph-assigned probability.
+
+State is `known`, `unknown`, or `unsupported`. The last two require `value=null`
+and a nonempty `reason`; these edges remain present. Zero known NVLinks differs
+from an unavailable count. A missing edge means no record was supplied, not
+zero distance or confirmed disconnection. Unknown NUMA information can stay in
+device diagnostics or an unknown affinity edge without inventing a NUMA endpoint.
+Future unrecognized kinds/schema versions are rejected rather than dropped;
+use a supported kind with unsupported state when its observation is unavailable.
+
+## Affinity and node queries
+
+`nics_near_gpu(gpu_id)` and `gpus_near_nic(nic_id)` return every tie for the
+best **known** affinity category, sorted by stable vertex ID. `AFFINITY_ORDER`
+exposes the ordinal convention:
+
+```text
+same-device < same-switch < same-root-complex < same-numa < cross-numa
+```
+
+These are categories, not bandwidth, latency, or scheduling weights. Unknown
+and unsupported edges do not participate; no known candidate returns an empty
+tuple. Cross-NUMA may be the best known candidate when closer relationships
+are unknown. Inspect those edges before interpreting a result as physically
+closest. Confidence and NIC state remain available to callers; queries do not
+select a usable interface, reserve a device, or enforce placement.
+
+`relationships_within_node(node_id)` includes every supplied intra-node edge,
+including unknown/unsupported ones. `vertex(id)` retrieves an entity. Missing
+IDs raise `KeyError`; querying a NIC as a GPU (or vice versa) raises `ValueError`.
+Queries never infer affinity from legacy GPU-pair ancestry or advertised speed.
+
+## Serialization and legacy loading
+
+`as_dict()` and `to_json()` emit schema version `1`, sorted `vertices`, and
+sorted `relationships`. JSON keys and undirected endpoint IDs are canonical;
+edges sort by kind/source/target. Nested evidence arrays keep their original
+order and values. Non-JSON values, non-string keys, NaN, and infinity are
+rejected. Duplicate edges require explicit evidence reconciliation by the
+caller. Attributes/evidence are copied on input and dictionary export; treat
+the stored payloads as snapshots.
+
+`from_dict()` / `from_json()` accept that format or one legacy GPU-only
+inventory dictionary (or a list of them). `from_inventory()` takes one existing
+`RayNodeInventory`:
+
+```python
+from topology_scheduler import TopologyGraph
+
+# inventory is a RayNodeInventory from discover_ray_gpu_inventory().
+graph = TopologyGraph.from_inventory(inventory)
+assert TopologyGraph.from_json(graph.to_json()).to_json() == graph.to_json()
+```
+
+Node metadata and GPU properties become attributes; each original connection
+record is retained as evidence on separate NVLink and ancestry edges. Because
+legacy records do not provide confidence or unavailable-versus-unsupported
+diagnostics, the adapter uses `legacy-inventory`, unknown confidence, and
+unknown state for missing/null fields. An `unknown-<value>` NVML category stays
+in evidence with unknown state. Device-only records without `connections` load
+without fabricated GPU-pair edges. Existing inventory models, discovery output,
+and planner conversion remain unchanged. This is a one-way format upgrade:
+new graph round trips preserve the converted representation, not legacy array
+order or format.
+
+## Example, validation, and enforcement boundary
+
+From the repository root, run:
+
+```bash
+python -m examples.topology_graph
+```
+
+The [example](../examples/topology_graph.py) labels its output `synthetic_inputs`,
+prints a two-GPU/three-NIC/two-NUMA graph, and shows ties, reverse queries, and
+an unsupported relationship. It needs no optional dependencies or hardware.
+[Tests](../tests/test_topology.py) cover legacy loading, missing fields, raw
+evidence, canonical serialization, multiple nodes/domains/NICs, and ties.
+
+Observed topology, derived affinity, planner preference, and backend enforcement
+remain separate. Neither the policy nor Ray/KAI binds workers to GPU/NIC IDs
+from this graph. No policy weight, reservation, or runtime dependency changes.
+Active measurements belong to
+[#17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17);
+future measured edges need direction, units, timestamps, and provenance without
+replacing the physical observations represented here.

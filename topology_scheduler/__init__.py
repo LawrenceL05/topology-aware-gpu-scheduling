@@ -9,6 +9,10 @@ from .inventory import (
     GPUConnection, GPUDevice, RayNodeInventory, discover_planner_nodes,
     discover_ray_gpu_inventory,
 )
+from .topology import (
+    AFFINITY_ORDER, RELATIONSHIP_TYPES, RelationshipType, TopologyGraph,
+    TopologyRelationship, TopologyVertex,
+)
 from .kai_backend import (
     ClusterNode, KAIStatus, KAIWorkload, KubernetesKAIClient, PodState,
     build_kai_objects, cancel, preflight, run as run_kai, status, submit,
@@ -16,6 +20,8 @@ from .kai_backend import (
 )
 
 __all__ = [
+    "AFFINITY_ORDER", "RELATIONSHIP_TYPES", "RelationshipType", "TopologyGraph",
+    "TopologyRelationship", "TopologyVertex",
     "ClusterNode", "ExecutionRecord", "GPUConnection", "GPUDevice", "KAIStatus",
     "KAIWorkload", "KubernetesKAIClient", "PodState",
     "Node", "Plan",
