@@ -15,7 +15,7 @@ published release. See [current status and validation](docs/current-status.md).
   pinned TP=1 worker processes, readiness checks, Linux process-tree guardians,
   driver leases, rollback, and conservative cleanup/recovery. Includes CPU
   lifecycle tests and a real-Ray fake-engine smoke; real-GPU inference remains
-  unverified ([issue #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2)).
+  unverified ([PR #30](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/30)).
 
 - A project roadmap defining topology, Dynamo, evaluation, and release-readiness
   milestones, issue triage, dependencies, exit criteria, and maintainer setup
