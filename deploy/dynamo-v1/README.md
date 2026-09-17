@@ -2,8 +2,9 @@
 
 This directory records the exact environment selected by the
 [V1 Dynamo contract](../../docs/dynamo-v1-contract.md). It prepares an image for
-the worker-lifecycle implementation tracked in issue 2; it does not claim that
-the integration or a real-GPU run already exists.
+the [worker-lifecycle adapter](../../docs/dynamo-lifecycle.md). The adapter has
+CPU/fake-engine coverage; the container build and real-GPU serving run remain
+unverified in issue 3.
 
 Build from the repository root on a Linux/amd64 Docker host:
 
