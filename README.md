@@ -75,10 +75,11 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 ## Repository Status
 
 This repository includes an initial Python placement policy, automatic
-intra-node GPU topology discovery, a Ray execution adapter, and a KAI Scheduler
-lifecycle adapter. It is an experimental foundation: real GPU benchmarks,
-workload traces, inter-node topology discovery, and the Dynamo worker lifecycle
-are not yet included.
+intra-node GPU topology discovery, opt-in inter-node TCP link measurement, a Ray
+execution adapter, and a KAI Scheduler lifecycle adapter. It is an experimental
+foundation: real GPU benchmarks, workload traces, NIC inventory and GPU-to-NIC
+affinity, a physical multi-node link measurement, and the Dynamo worker
+lifecycle are not yet included.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,
@@ -92,6 +93,7 @@ propose scheduler changes, run validation, and prepare a pull request.
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
 - **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
 - **[V1 Dynamo contract](docs/dynamo-v1-contract.md)**: pins the Ray, Dynamo, vLLM, Python, CUDA, driver, Linux, model, ownership, readiness, and shutdown contract for independent single-GPU replicas.
+- **[Inter-node link measurement](docs/link-measurement.md)**: opt-in TCP throughput and latency probes between Ray nodes, normalized into planner bandwidth with each value's source recorded.
 
 ```bash
 python -m pip install -e '.[ray]'
@@ -126,8 +128,9 @@ nodes = discover_planner_nodes()
 plan = choose_placement(nodes, Workload(2, 40, {"H100": 10}), {})
 ```
 
-The workload profile and inter-node network bandwidth remain explicit
-experimental inputs; they are not GPU hardware facts. Run
+The workload profile remains an explicit experimental input, not a GPU hardware
+fact. Inter-node bandwidth is supplied as well, unless a controlled
+[link measurement](docs/link-measurement.md) run produces it. Run
 `python -m examples.ray_inventory` to print the detected hardware and
 intra-node graph. Each GPU node must advertise exactly one
 `topology_node:<name>` custom resource. The current Ray adapter reserves a node
