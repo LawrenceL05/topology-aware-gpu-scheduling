@@ -86,6 +86,11 @@ propose scheduler changes, run validation, and prepare a pull request. See the
 **[release process](docs/releasing.md)** for how a version number, changelog
 section, annotated tag, and GitHub Release are produced.
 
+The **[project roadmap](docs/roadmap.md)** defines Topology Discovery, Dynamo
+Integration, Evaluation, and Next Release milestones, their dependencies, and
+evidence required for completion. Track live assignments and progress in
+[GitHub milestones](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/milestones).
+
 ## Ray Source and Runnable Integration
 
 - **[Complete Ray source code](https://github.com/ray-project/ray)** and **[the pinned Ray 2.55.0 source tree](https://github.com/ray-project/ray/tree/ray-2.55.0)**.
