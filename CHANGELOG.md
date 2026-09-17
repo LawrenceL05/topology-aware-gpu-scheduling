@@ -55,6 +55,12 @@ published release. See [current status and validation](docs/current-status.md).
   tag-correction rules
   ([PR #25](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/25));
   no tag or release is published by it.
+- GPU to NUMA and nearest-NIC mapping read from host sysfs on each Ray node,
+  with PCI ancestry, per-interface proximity and its evidence, explicit unknown
+  states with diagnostics, stable ordering and serialization, and a runnable
+  example
+  ([PR #29](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/29));
+  proximity is structural and is not a bandwidth claim.
 
 ### Changed
 
@@ -72,7 +78,11 @@ published release. See [current status and validation](docs/current-status.md).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- NIC affinity and inter-node bandwidth or latency are not discovered.
+- Host locality reads NUMA and interface data from Linux sysfs only, and keeps
+  unreadable or absent values as an explicit unknown. It observes proximity; it
+  does not bind a GPU to a NIC or feed placement scoring.
+- A typed affinity graph, full NIC inventory, and inter-node bandwidth or
+  latency are not discovered.
 
 ### Planned
 

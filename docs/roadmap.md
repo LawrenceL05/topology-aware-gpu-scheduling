@@ -34,6 +34,9 @@ then [typed affinity graph #16](https://github.com/LawrenceL05/topology-aware-gp
 then [inter-node measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17).
 Issue #16 consumes both #14 and #15; #17 uses all three to identify and interpret
 measurement endpoints. Test design may proceed earlier using explicit fixtures.
+[Host locality](host-topology.md) landed ahead of #14 on fixtures, reading
+interfaces from sysfs directly; #14 can replace those reads without changing
+its classification.
 
 Exit criteria:
 
