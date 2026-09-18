@@ -55,6 +55,13 @@ published release. See [current status and validation](docs/current-status.md).
   tag-correction rules
   ([PR #25](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/25));
   no tag or release is published by it.
+- Network interface discovery on every live Ray node, recording MAC, PCI
+  function, NUMA node, driver, state, MTU, advertised link speed, and RDMA
+  devices matched by PCI address, with per-field source and confidence so an
+  unavailable, unsupported, or unreadable value is never mistaken for zero, a
+  runnable example, and stable serialization beside the GPU inventory
+  ([PR #33](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/33));
+  advertised speed is not measured throughput.
 
 ### Changed
 
@@ -72,7 +79,10 @@ published release. See [current status and validation](docs/current-status.md).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- NIC affinity and inter-node bandwidth or latency are not discovered.
+- GPU-to-NIC affinity and inter-node bandwidth or latency are not discovered.
+  The NIC inventory reports advertised link speed from Linux sysfs only; that
+  is not measured throughput, and virtualized hosts often leave PCI, NUMA, or
+  speed unavailable.
 
 ### Planned
 

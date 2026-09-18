@@ -29,6 +29,7 @@ CPU_COMMANDS = (
     "python -m examples.compare_policies",
     "python -m examples.kai_manifest",
     "python -m examples.kai_submit --help",
+    "python -m examples.nic_inventory",
 )
 
 

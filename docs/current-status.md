@@ -21,7 +21,8 @@ No real GPU cluster or inference benchmark evidence is recorded here.
 | V1.1 inventory and V1.2 intra-node topology | Implemented; mocked NVML tests | [Inventory tests](../tests/test_inventory.py); physical NVML validation remains outstanding. GPU edges are observational, not scoring inputs or UUID enforcement. |
 | KAI object and lifecycle adapter | Implemented; mocked Kubernetes tests and synthetic manifests | [KAI tests](../tests/test_kai_backend.py), [manifest example](../examples/kai_manifest.py); live-cluster admission, execution, and cleanup need validation. |
 | Dynamo V1 | Contract and environment recipe implemented; worker lifecycle planned | [Contract tests](../tests/test_dynamo_contract.py), [contract](dynamo-v1-contract.md); [worker lifecycle #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2) and [GPU validation #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3) remain open. |
-| GPU-to-NIC affinity and inter-node discovery | Planned | [NIC inventory #14](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/14), [NUMA/NIC mapping #15](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/15), [affinity graph #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16), [network measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17). |
+| NIC inventory | Implemented; fixture-based unit tests and a real-sysfs check on a Linux host | [NIC tests](../tests/test_nic_inventory.py), [example](../examples/nic_inventory.py), [guide](nic-inventory.md); advertised speed is not measured throughput, and no physical InfiniBand or multi-NIC host has been inventoried. |
+| GPU-to-NIC affinity and inter-node discovery | Planned | [NUMA/NIC mapping #15](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/15), [affinity graph #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16), [network measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17). |
 
 ## Versions
 
@@ -63,6 +64,7 @@ python -m examples.plan
 python -m examples.compare_policies
 python -m examples.kai_manifest
 python -m examples.kai_submit --help
+python -m examples.nic_inventory
 ```
 
 The list must match the allowlist in [the checker](../scripts/check_docs.py).
