@@ -11,6 +11,9 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Added
 
+- Matched serial job traces across all five reference policies, terminal failure
+  records, observed GPU-count JCT normalization, shared execution conformance
+  tests, and a simulated two-node Ray comparison example (issue #5).
 - A project roadmap defining topology, Dynamo, evaluation, and release-readiness
   milestones, issue triage, dependencies, exit criteria, and maintainer setup
   ([PR #26](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/26)).

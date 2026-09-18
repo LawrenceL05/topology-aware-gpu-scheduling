@@ -3,7 +3,7 @@
 from .policy import Node, Plan, PolicyName, Workload, choose_placement
 from .comparison import (
     ExecutionRecord, PlanningRecord, RecordedExecutionError, plan_with_record,
-    run_with_record,
+    TraceJob, TraceRecord, run_matched_trace, run_with_record,
 )
 from .inventory import (
     GPUConnection, GPUDevice, RayNodeInventory, discover_planner_nodes,
@@ -23,5 +23,5 @@ __all__ = [
     "Workload", "build_kai_objects", "cancel", "choose_placement",
     "discover_planner_nodes", "preflight", "run_kai", "status", "submit",
     "discover_ray_gpu_inventory", "plan_with_record", "run_with_record",
-    "validate_submission",
+    "validate_submission", "TraceJob", "TraceRecord", "run_matched_trace",
 ]

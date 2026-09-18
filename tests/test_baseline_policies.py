@@ -57,6 +57,35 @@ class BaselinePolicyTests(unittest.TestCase):
             )
             self.assertIsNone(plan.estimated_seconds)
 
+    def test_gpu_count_does_not_require_model_profile_or_topology(self):
+        nodes = [Node("a", "UNKNOWN", 1, 80), Node("b", "SLOW", 1, 80),
+                 Node("c", "FAST", 2, 80)]
+        workload = Workload(2, 40, {"SLOW": 100, "FAST": 1}, 10)
+        plan = choose_placement(nodes, workload, {}, policy=PolicyName.GPU_COUNT)
+        self.assertEqual(tuple(n.name for n in plan.workers), ("a", "b"))
+        self.assertIsNone(plan.estimated_seconds)
+
+    def test_topology_only_ignores_model_performance(self):
+        for estimates in ({"OTHER": 1}, {"A": 1, "TOPO": 1000}):
+            workload = Workload(2, 40, estimates, 10)
+            plan = choose_placement(self.nodes, workload, self.bandwidth,
+                                    policy=PolicyName.TOPOLOGY_ONLY)
+            self.assertEqual(tuple(n.name for n in plan.workers), ("g", "h"))
+
+    def test_only_topology_policies_require_communicating_links(self):
+        nodes = [Node("a", "A", 1, 80), Node("b", "A", 1, 80)]
+        workload = Workload(2, 40, {"A": 1}, 10)
+        for policy in PolicyName:
+            options = {"accelerator_type": "A"} if policy is PolicyName.ACCELERATOR_TYPE else {}
+            with self.subTest(policy=policy):
+                if policy in (PolicyName.TOPOLOGY_ONLY, PolicyName.COMBINED):
+                    with self.assertRaisesRegex(ValueError, "communication"):
+                        choose_placement(nodes, workload, {}, policy=policy, **options)
+                else:
+                    self.assertEqual(len(choose_placement(
+                        nodes, workload, {}, policy=policy, **options,
+                    ).workers), 2)
+
     def test_all_policies_share_memory_and_capacity_checks(self):
         nodes = [Node("small", "A", 2, 20), Node("one", "A", 1, 80)]
         workload = Workload(2, 40, {"A": 1})
