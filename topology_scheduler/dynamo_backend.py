@@ -23,6 +23,10 @@ from .policy import Plan, positive
 
 RUNTIME_PINS = {"ray": "2.55.0", "ai-dynamo": "1.4.2", "vllm": "0.26.0"}
 RAY_NAMESPACE = "topology-scheduler-dynamo"
+CONTRACT_PATH = Path(__file__).resolve().parents[1] / "deploy" / "dynamo-v1" / "contract.json"
+# Mirrors contract.json: close() stops the first list and never the second.
+ADAPTER_OWNED = ("ray_placement_group", "dynamo_vllm_workers", "worker_logs")
+CALLER_OWNED = ("etcd", "nats", "dynamo_frontend", "model_credentials")
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,38 @@ class DynamoConfig:
                 "--disaggregation-mode", "agg", "--no-headless",
                 "--max-model-len", str(self.max_model_length),
                 "--gpu-memory-utilization", str(self.gpu_memory_utilization)]
+
+    @classmethod
+    def from_contract(cls, path=CONTRACT_PATH, **overrides):
+        """Build a configuration from the V1 contract document.
+
+        The field defaults above copy the contract, and a copy drifts the
+        moment the contract changes. Deriving them keeps one source of truth;
+        a test asserts the two agree. ``overrides`` still apply for whatever a
+        deployment must change, such as a frontend on another host.
+
+        The default path points into the repository, so an installed wheel
+        that does not ship ``deploy/`` must pass its own path.
+        """
+        contract = json.loads(Path(path).read_text(encoding="utf-8"))
+        model, service = contract["model"], contract["service"]
+        host = service["frontend_host"]
+        return cls(**{
+            "namespace": service["namespace"],
+            "frontend_url": "http://{}:{}".format(
+                "127.0.0.1" if host == "0.0.0.0" else host, service["frontend_port"]),
+            "etcd_endpoints": service["etcd_endpoints"],
+            "nats_server": service["nats_server"],
+            "model": model["id"],
+            "revision": model["revision"],
+            "max_model_length": model["max_model_length"],
+            "gpu_memory_utilization": model["gpu_memory_utilization"],
+            "tensor_parallel_size": service["tensor_parallel_size"],
+            "system_port_base": service["worker_system_port_base"],
+            "startup_timeout": service["startup_deadline_seconds"],
+            "shutdown_timeout": service["shutdown_deadline_seconds"],
+            **overrides,
+        })
 
 
 def _http_json(url, timeout, payload=None):

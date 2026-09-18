@@ -39,6 +39,34 @@ another service. Choose non-overlapping system-port ranges for concurrent
 deployments on the same hosts. `system_port_base + replica_index` must be free;
 the actor checks before launch. This is not a cluster-wide port allocator.
 
+## Where the configuration comes from
+
+`DynamoConfig` field defaults mirror
+[`contract.json`](../deploy/dynamo-v1/contract.json): the model and its
+revision, the maximum model length, GPU memory utilization, the namespace,
+etcd and NATS endpoints, the first system port, and the startup and shutdown
+deadlines. A copy drifts as soon as the contract changes, so
+`DynamoConfig.from_contract()` derives them instead, and a test asserts the
+derived configuration equals the defaults. Use it, and override only what a
+deployment must change:
+
+```python
+from topology_scheduler.dynamo_backend import DynamoConfig
+
+config = DynamoConfig.from_contract(
+    namespace="experiment-001",
+    frontend_url="http://FRONTEND_HOST:8000",
+)
+```
+
+`from_contract()` also turns the contract's `0.0.0.0` bind address into a
+reachable client URL. Its default path points into the repository, so an
+installed wheel without `deploy/` must pass a path.
+
+`ADAPTER_OWNED` and `CALLER_OWNED` name the same split the contract does, and
+a test pins them to it. `close()` stops what the first names and never touches
+the second.
+
 ## Driver API
 
 On a prepared cluster, using an existing plan and caller-started frontend:
@@ -50,7 +78,7 @@ import ray
 from topology_scheduler import DynamoConfig, DynamoService
 
 ray.init(address="auto", namespace="topology-scheduler-dynamo")
-config = DynamoConfig(
+config = DynamoConfig.from_contract(
     namespace="experiment-001",  # also set on the caller's dedicated frontend
     frontend_url="http://FRONTEND_HOST:8000",
     etcd_endpoints="http://ETCD_HOST:2379",
