@@ -59,7 +59,9 @@ published release. See [current status and validation](docs/current-status.md).
   function, NUMA node, driver, state, MTU, advertised link speed, and RDMA
   devices matched by PCI address, with per-field source and confidence so an
   unavailable, unsupported, or unreadable value is never mistaken for zero, a
-  runnable example, and stable serialization beside the GPU inventory.
+  runnable example, and stable serialization beside the GPU inventory
+  ([PR #33](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/33));
+  advertised speed is not measured throughput.
 
 ### Changed
 
