@@ -60,7 +60,9 @@ serialized = [record.as_dict() for record in records]
 ```
 
 The caller supplies `nodes`, `workload`, `worker(rank)`, and `bandwidth` as in
-the [Ray guide](ray-integration.md). Worker return values are discarded by this
+the [Ray guide](ray-integration.md). Ray workers must be serializable functions,
+as required by the existing adapter; use a closure to bind additional arguments.
+Worker return values are discarded by this
 measurement harness; workload artifacts should be persisted by the worker.
 Jobs run serially, and each policy completes the whole trace before the next
 policy starts. This does not simulate an arrival schedule or concurrent queue.

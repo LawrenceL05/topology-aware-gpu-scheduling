@@ -1,6 +1,5 @@
 """Matched traces on two real Ray nodes with simulated GPUs; NOT a benchmark."""
 
-from functools import partial
 import json
 
 import ray
@@ -29,7 +28,9 @@ def main():
         node_ids = tuple(next(n["NodeID"] for n in ray.nodes()
                               if n["Alive"] and f"topology_node:{name}" in n["Resources"])
                          for name in ("a", "b"))
-        worker = partial(probe, node_ids=node_ids)
+        def worker(rank):
+            return probe(rank, node_ids=node_ids)
+
         workload = Workload(2, 1, {"SIMULATED": 1}, 1)
         records = run_matched_trace(
             [Node(name, "SIMULATED", 1, 80) for name in ("a", "b")],
@@ -41,7 +42,9 @@ def main():
         )
         assert len(records) == len(PolicyName) * 3
         for before, failed, after in zip(records[::3], records[1::3], records[2::3]):
-            assert before.status == after.status == "succeeded"
+            assert before.status == after.status == "succeeded", (
+                before.as_dict(), after.as_dict(),
+            )
             assert failed.status == "failed"
             assert failed.execution is not None
             assert "intentional matched-trace failure" in failed.execution.error
