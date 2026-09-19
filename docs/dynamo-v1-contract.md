@@ -4,8 +4,9 @@ See [current implementation, validation status, and versions](current-status.md)
 for the shared support summary and evidence boundaries.
 
 This document fixes the architecture and runtime for the first Dynamo
-milestone. The worker lifecycle is planned, not implemented. In that design,
-V1 will use Ray to reserve GPUs and own long-lived worker processes,
+milestone. The [worker lifecycle adapter](dynamo-lifecycle.md) is implemented
+with CPU/fake-engine coverage; real Dynamo/GPU serving remains unverified.
+V1 uses Ray to reserve GPUs and own long-lived worker processes,
 Dynamo to register and route serving endpoints, and vLLM to execute the model.
 It preserves the existing planner and finite-task adapter.
 
@@ -94,7 +95,7 @@ runtime when needed. These shared services survive an individual placement
 attempt.
 
 The new adapter in [issue #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2)
-will own the Ray placement group, one long-lived Ray actor per replica, each actor's `dynamo.vllm` child process, and the worker log
+owns the Ray placement group, one long-lived Ray actor per replica, each actor's guarded `dynamo.vllm` process, and the worker log
 files. It must never stop caller-owned infrastructure or the frontend.
 
 Workers register with Dynamo using the shared namespace, discovery backend, and
@@ -120,7 +121,7 @@ python3 -m dynamo.frontend \
   --event-plane nats
 ```
 
-For each Plan entry, the Ray-owned actor will run the equivalent of:
+For each Plan entry, the Ray-owned actor runs the equivalent of:
 
 ```bash
 # Ray sets CUDA_VISIBLE_DEVICES before the actor starts.
@@ -146,7 +147,7 @@ accepted as user input.
 
 ## Plan mapping and scoring
 
-Each entry in `Plan.nodes` creates one independent replica and consumes one Ray
+Each entry in `Plan.workers` creates one independent replica and consumes one Ray
 placement-group bundle with one CPU, one GPU, and that node's
 `topology_node:<name>` marker. Repeated node names create separate replicas on
 the same node. Replica index supplies stable result, port, and log naming.
@@ -201,3 +202,9 @@ cost inputs before they can be advertised.
 - [Dynamo 1.4.2 dependency declaration](https://github.com/ai-dynamo/dynamo/blob/v1.4.2/pyproject.toml)
 - [Ray 2.55.0 release](https://github.com/ray-project/ray/releases/tag/ray-2.55.0)
 - [Pinned Qwen model revision](https://huggingface.co/Qwen/Qwen3-0.6B/tree/c1899de289a04d12100db370d81485cdf75e47ca)
+
+The adapter also forces PP=1, DP=1, aggregated mode, and the local `mp` executor.
+See the [lifecycle guide](dynamo-lifecycle.md) for configurable replica CPUs,
+frontend preflight, isolated names, Linux process containment, and retained
+reservations when cleanup cannot be verified. These are implementation details
+of the pinned contract, not evidence of a real-GPU run.

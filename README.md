@@ -77,8 +77,9 @@ Normalized JCT is the stated evaluation metric. The exact normalization baseline
 This repository includes an initial Python placement policy, automatic
 intra-node GPU topology discovery, a Ray execution adapter, and a KAI Scheduler
 lifecycle adapter. It is an experimental foundation: real GPU benchmarks,
-workload traces, inter-node topology discovery, and the Dynamo worker lifecycle
-are not yet included.
+workload traces, and inter-node topology discovery are not yet included. The
+[Dynamo lifecycle adapter](docs/dynamo-lifecycle.md) has CPU/fake-engine coverage;
+real Dynamo/CUDA inference remains unverified.
 
 See the **[changelog](CHANGELOG.md)** for version differences, improvements,
 and known limitations. See **[Contributing](CONTRIBUTING.md)** to report issues,

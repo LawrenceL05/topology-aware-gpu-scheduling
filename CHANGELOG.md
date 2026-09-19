@@ -15,6 +15,12 @@ published release. See [current status and validation](docs/current-status.md).
   records, observed GPU-count JCT normalization, shared execution conformance
   tests, and a simulated two-node Ray comparison example
   ([PR #34](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/34)).
+- A persistent Ray-managed Dynamo replica adapter with atomic reservations,
+  pinned TP=1 worker processes, readiness checks, Linux process-tree guardians,
+  driver leases, rollback, and conservative cleanup/recovery. Includes CPU
+  lifecycle tests and a real-Ray fake-engine smoke; real-GPU inference remains
+  unverified ([PR #30](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/30)).
+
 - A project roadmap defining topology, Dynamo, evaluation, and release-readiness
   milestones, issue triage, dependencies, exit criteria, and maintainer setup
   ([PR #26](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/26)).
@@ -53,12 +59,18 @@ published release. See [current status and validation](docs/current-status.md).
   independent single-GPU replicas, plus a machine-readable example and
   container recipe
   ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9));
-  the worker lifecycle and GPU inference validation remain planned.
+  the lifecycle adapter now has CPU/fake-engine coverage; GPU inference
+  validation remains outstanding.
 - A documented release process covering semantic-versioning rules, a release
   checklist, annotated `vX.Y.Z` tags, release-note contents, and rollback and
   tag-correction rules
   ([PR #25](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/25));
   no tag or release is published by it.
+
+- The Dynamo configuration is derived from the pinned contract through
+  `DynamoConfig.from_contract()`, with declared adapter and caller ownership
+  lists, so the contract stays the single source of truth instead of being
+  copied into field defaults.
 
 ### Changed
 
@@ -80,9 +92,8 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Planned
 
-- Dynamo worker lifecycle implementation and real-GPU validation remain tracked
-  in [issue #2](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/2)
-  and [issue #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3).
+- Dynamo image-build and real-GPU validation remain tracked in
+  [issue #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3).
 
 ## [0.1.1] - 2026-09-14
 
