@@ -16,7 +16,7 @@ No real GPU cluster or inference benchmark evidence is recorded here.
 
 | Area | Current state | Evidence and remaining boundary |
 | --- | --- | --- |
-| Placement and five baseline policies | Implemented; synthetic examples | [Policy tests](../tests/test_policy.py), [baseline tests](../tests/test_baseline_policies.py); scores are not measured JCT. |
+| Placement and five baseline policies | Implemented; synthetic planning and simulated matched trace execution | [Policy tests](../tests/test_policy.py), [baseline tests](../tests/test_baseline_policies.py), [trace tests](../tests/test_matched_trace.py), and [Ray trace example](../examples/compare_policy_traces.py); synthetic scores and simulated JCT ratios are not GPU benchmark evidence. |
 | Ray finite-task adapter | Implemented; mocked unit tests and simulated logical-GPU smoke coverage | [Tests](../tests/test_ray_backend.py), [single-node](../examples/ray_smoke.py) and [multi-node smoke](../examples/ray_multinode_smoke.py); no CUDA workload. |
 | V1.1 inventory and V1.2 intra-node topology | Implemented; mocked NVML tests | [Inventory tests](../tests/test_inventory.py); physical NVML validation remains outstanding. GPU edges are observational, not scoring inputs or UUID enforcement. |
 | KAI object and lifecycle adapter | Implemented; mocked Kubernetes tests and synthetic manifests | [KAI tests](../tests/test_kai_backend.py), [manifest example](../examples/kai_manifest.py); live-cluster admission, execution, and cleanup need validation. |

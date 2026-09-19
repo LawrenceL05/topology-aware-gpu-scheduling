@@ -195,6 +195,16 @@ nodes.
 
 ## Scope and next experiments
 
+The [matched trace harness](baseline-policies.md#executing-a-matched-trace)
+executes every reference policy through this unchanged adapter, using identical
+rank callables and timeout options. Its job terminal timestamp follows adapter
+return, including cleanup requests; placement-group removal is asynchronous,
+so this is not proof that physical resources were released at that timestamp.
+The next serial job still waits for its own atomic reservation. Run `python -m
+examples.compare_policy_traces` to verify success, worker failure, and subsequent
+reservation on two local Ray nodes with simulated GPUs. Its measured durations
+and normalized ratios are integration output, not inference performance evidence.
+
 This is a functional task-placement prototype, not a complete distributed LLM
 inference service. Each task requests one CPU and one GPU. Ray assigns the
 physical GPU IDs; although V1.2 discovers intra-node relationships, the policy
