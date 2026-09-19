@@ -27,3 +27,4 @@ jobs:
       - run: python -m examples.kai_submit --help
       - run: python -m examples.ray_smoke
       - run: python -m examples.ray_multinode_smoke
+      - run: python -m examples.dynamo_smoke
