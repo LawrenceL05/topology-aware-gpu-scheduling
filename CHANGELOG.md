@@ -63,6 +63,11 @@ published release. See [current status and validation](docs/current-status.md).
   ([PR #25](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/25));
   no tag or release is published by it.
 
+- The Dynamo configuration is derived from the pinned contract through
+  `DynamoConfig.from_contract()`, with declared adapter and caller ownership
+  lists, so the contract stays the single source of truth instead of being
+  copied into field defaults.
+
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
