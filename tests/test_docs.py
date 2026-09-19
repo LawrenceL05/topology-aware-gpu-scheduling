@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.check_docs import (
-    ROOT, check_links, check_versions, documented_commands, main,
+    CPU_COMMANDS, ROOT, check_links, check_versions, documented_commands, main,
 )
 
 
@@ -99,7 +99,7 @@ class DocumentationTests(unittest.TestCase):
         with patch('sys.argv', ['check_docs.py', '--run-examples']), \
              patch('scripts.check_docs.subprocess.run') as run:
             self.assertEqual(main(), 0)
-            self.assertEqual(run.call_count, 4)
+            self.assertEqual(run.call_count, len(CPU_COMMANDS))
             for call in run.call_args_list:
                 self.assertEqual(call.kwargs['timeout'], 60)
                 self.assertFalse(call.kwargs.get('shell', False))
