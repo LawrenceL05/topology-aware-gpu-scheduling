@@ -11,6 +11,11 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Added
 
+- A reproducible single-GPU validation report and workflow covering physical
+  NVML inventory, Ray GPU assignment, oversubscription rejection, baseline
+  policies, backend contract suites, and a direct CUDA smoke test. Multi-GPU,
+  live KAI, and Dynamo/vLLM validation remain outstanding.
+
 - A persistent Ray-managed Dynamo replica adapter with atomic reservations,
   pinned TP=1 worker processes, readiness checks, Linux process-tree guardians,
   driver leases, rollback, and conservative cleanup/recovery. Includes CPU

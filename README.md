@@ -66,7 +66,10 @@ support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html).
 See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
 startup and GPU discovery through planning, reservation, execution, and cleanup.
 The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)** explains the new
-GPU relationship graph and its current enforcement boundary.
+GPU relationship graph and its current enforcement boundary. The
+**[single-GPU validation report](docs/one-gpu-validation.md)** records the first
+physical-GPU inventory, Ray assignment, oversubscription rejection, and direct
+CUDA smoke test.
 
 ## Evaluation
 
