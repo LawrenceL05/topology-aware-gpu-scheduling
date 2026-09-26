@@ -16,6 +16,13 @@ published release. See [current status and validation](docs/current-status.md).
   policies, backend contract suites, and a direct CUDA smoke test. Multi-GPU,
   live KAI, and Dynamo/vLLM validation remain outstanding.
 
+- A typed GPU/NIC/NUMA/node graph with evidence-bearing relationships,
+  deterministic serialization, legacy GPU inventory loading, affinity queries,
+  collector-snapshot adapters with identity/conflict validation, and a CPU
+  example that also reads exported snapshots. Integration tests exercise the
+  merged NIC collector with sysfs fixtures. Automatic affinity discovery and
+  backend device binding remain separate work
+  ([PR #28](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/28)).
 - A persistent Ray-managed Dynamo replica adapter with atomic reservations,
   pinned TP=1 worker processes, readiness checks, Linux process-tree guardians,
   driver leases, rollback, and conservative cleanup/recovery. Includes CPU

@@ -30,6 +30,7 @@ CPU_COMMANDS = (
     "python -m examples.kai_manifest",
     "python -m examples.kai_submit --help",
     "python -m examples.nic_inventory",
+    "python -m examples.topology_graph",
 )
 
 
