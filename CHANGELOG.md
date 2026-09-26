@@ -82,6 +82,18 @@ published release. See [current status and validation](docs/current-status.md).
   `DynamoConfig.from_contract()`, with declared adapter and caller ownership
   lists, so the contract stays the single source of truth instead of being
   copied into field defaults.
+- Opt-in directional TCP throughput and round-trip latency measurement between
+  live Ray nodes, with bounded probe parameters, per-direction records and
+  diagnostics, JSON reuse under an explicit maximum age, and normalization into
+  the planner's bandwidth map
+  ([PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27));
+  endpoint records now retain the merged NIC collector's identity, PCI/NUMA,
+  RDMA, field provenance, partial states, and diagnostics. Earlier schema-1
+  reports remain loadable. Tested with fixtures, loopback sockets, and two Ray
+  nodes on one host, not on a physical cluster.
+- Planning records now state whether each bandwidth value was measured,
+  advertised, a fallback, or supplied by the caller
+  ([PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27)).
 
 ### Changed
 
@@ -99,10 +111,11 @@ published release. See [current status and validation](docs/current-status.md).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- GPU-to-NIC affinity and inter-node bandwidth or latency are not discovered.
-  The NIC inventory reports advertised link speed from Linux sysfs only; that
-  is not measured throughput, and virtualized hosts often leave PCI, NUMA, or
-  speed unavailable.
+- GPU-to-NIC affinity is not derived. NIC inventory reports advertised speed,
+  not measured throughput; virtualized hosts may leave PCI, NUMA, or speed unknown.
+- Link measurement covers TCP over each node's Ray address. It is not RDMA,
+  GPUDirect RDMA, or NCCL throughput, and the cost model does not use RTT.
+  Matching probe addresses to interfaces is Linux primary-IPv4-only.
 
 ### Planned
 

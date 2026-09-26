@@ -1,9 +1,11 @@
 """Machine-readable planning records for controlled policy comparisons."""
 
 from dataclasses import dataclass
+from math import isclose
 from time import perf_counter_ns
 from typing import Mapping
 
+from .links import LinkCost, LinkCostSource
 from .policy import Node, Plan, PolicyName, Workload, choose_placement
 
 
@@ -63,8 +65,20 @@ def plan_with_record(
     bandwidth_gbps: Mapping[tuple[str, str], float], *,
     policy: PolicyName | str,
     accelerator_type: str | None = None,
+    link_costs: Mapping[tuple[str, str], LinkCost] | None = None,
 ) -> tuple[Plan, PlanningRecord]:
-    """Plan once and capture the inputs, decision, score, and timing boundary."""
+    """Plan once and capture the inputs, decision, score, and timing boundary.
+
+    ``link_costs``, as returned by ``resolve_link_costs``, records whether each
+    bandwidth value was measured, advertised, or a fallback. Without it every
+    value is recorded as supplied by the caller.
+    """
+    if link_costs is not None and (
+        set(link_costs) != set(bandwidth_gbps)
+        or any(not isclose(link_costs[pair].gb_per_second, value)
+               for pair, value in bandwidth_gbps.items())
+    ):
+        raise ValueError("link_costs must describe exactly the supplied bandwidth values")
     started = perf_counter_ns()
     plan = choose_placement(
         nodes, workload, bandwidth_gbps, policy=policy,
@@ -90,6 +104,13 @@ def plan_with_record(
         "bandwidth_gbps": {
             f"{left}|{right}": value
             for (left, right), value in sorted(bandwidth_gbps.items())
+        },
+        "bandwidth_sources": {
+            f"{left}|{right}": (
+                link_costs[(left, right)].provenance() if link_costs is not None
+                else {"source": LinkCostSource.SUPPLIED.value, "measured_at": None}
+            )
+            for left, right in sorted(bandwidth_gbps)
         },
         "accelerator_type": accelerator_type,
     }

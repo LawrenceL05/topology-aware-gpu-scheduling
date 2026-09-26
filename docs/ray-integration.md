@@ -27,6 +27,7 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
 | V1.2 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads NVIDIA devices and their pairwise relationships through NVML. |
+| Link measurement | [links.py](../topology_scheduler/links.py) | Opt-in: pins a TCP probe server and client to each ordered node pair and normalizes the results into planner bandwidth. |
 | Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
 | Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
 | Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.55.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
@@ -95,8 +96,9 @@ See [V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics
 and limitations.
 
 The collector obtains hardware topology only. Workload compute measurements,
-memory requirements, communication volume, and inter-node link bandwidth are
-still inputs to the experiment.
+memory requirements, and communication volume are still inputs to the
+experiment. Inter-node link bandwidth can be supplied or, opt-in, measured over
+TCP; see [inter-node link measurement](link-measurement.md).
 
 ## Cost model
 

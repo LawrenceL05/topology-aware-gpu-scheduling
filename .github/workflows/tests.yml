@@ -29,3 +29,4 @@ jobs:
       - run: python -m examples.ray_multinode_smoke
       - run: python -m examples.ray_nic_smoke
       - run: python -m examples.dynamo_smoke
+      - run: python -m examples.ray_link_smoke
