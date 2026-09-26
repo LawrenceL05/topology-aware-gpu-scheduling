@@ -6,19 +6,96 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Package `0.1.2` is in development; V1.2 names the topology milestone, not a
+published release. See [current status and validation](docs/current-status.md).
+
 ### Added
 
+- A concise V1.2 workflow covering discovery, planner inputs, node placement,
+  Ray reservation, execution, and cleanup, with explicit device-enforcement
+  and validation boundaries
+  ([PR #8](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/8)).
+
+- A reproducible single-GPU validation report and workflow covering physical
+  NVML inventory, Ray GPU assignment, oversubscription rejection, baseline
+  policies, backend contract suites, and a direct CUDA smoke test. Multi-GPU,
+  live KAI, and Dynamo/vLLM validation remain outstanding.
+
+- A persistent Ray-managed Dynamo replica adapter with atomic reservations,
+  pinned TP=1 worker processes, readiness checks, Linux process-tree guardians,
+  driver leases, rollback, and conservative cleanup/recovery. Includes CPU
+  lifecycle tests and a real-Ray fake-engine smoke; real-GPU inference remains
+  unverified ([PR #30](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/30)).
+
+- A project roadmap defining topology, Dynamo, evaluation, and release-readiness
+  milestones, issue triage, dependencies, exit criteria, and maintainer setup
+  ([PR #26](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/26)).
+- Documentation update rules, PR checklist, shared status/version summary, and
+  GPU-free CI checks for local documentation links and approved examples
+  ([PR #22](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/22)).
+
+- Initial KAI Scheduler object adapter with gang scheduling, GPU requests,
+  planned-node selection, queue/node-pool metadata, and preflight validation
+  ([PR #12](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/12)).
+- KAI Kubernetes client lifecycle for live discovery and RBAC checks, ordered
+  submission, status polling, cancellation, rollback, timeout, and cleanup
+  ([PR #13](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/13)).
+- Named `ray` and `kai` backend selection with backend identity in execution
+  records, a live KAI smoke example, and deployable RBAC manifests
+  ([PR #13](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/13));
+  a physical KAI/GPU cluster run is not yet recorded.
+- Synthetic KAI manifest example and versioned integration guide
+  ([PR #12](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/12)).
+- Five deterministic reference policies for GPU-count, accelerator-type,
+  workload-compute, topology-only, and combined placement comparisons
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
+- Machine-readable planning records and a synthetic policy comparison example
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
+- Controlled normalized-JCT comparison guidance
+  ([PR #11](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/11)).
 - Contribution guidance for issues, development, research evidence, testing,
-  documentation, and pull requests.
+  documentation, and pull requests
+  ([commit 6468116](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/6468116)).
 - Automatic pairwise intra-node GPU topology discovery, including normalized
-  PCI/NUMA ancestry and active direct NVLink counts.
-- A public `GPUConnection` data model, a concise V1.2 workflow, and a detailed
-  topology discovery guide.
+  PCI/NUMA ancestry and active direct NVLink counts
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
+- A public `GPUConnection` data model and a V1.2 topology discovery guide
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
+- A release-specific V1 Dynamo contract for aggregated vLLM serving with
+  independent single-GPU replicas, plus a machine-readable example and
+  container recipe
+  ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9));
+  the lifecycle adapter now has CPU/fake-engine coverage; GPU inference
+  validation remains outstanding.
+- A documented release process covering semantic-versioning rules, a release
+  checklist, annotated `vX.Y.Z` tags, release-note contents, and rollback and
+  tag-correction rules
+  ([PR #25](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/25));
+  no tag or release is published by it.
+- Network interface discovery on every live Ray node, recording MAC, PCI
+  function, NUMA node, driver, state, MTU, advertised link speed, and RDMA
+  devices matched by PCI address, with per-field source and confidence so an
+  unavailable, unsupported, or unreadable value is never mistaken for zero, a
+  runnable example, and stable serialization beside the GPU inventory
+  ([PR #33](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/33));
+  advertised speed is not measured throughput. PCI/driver read failures retain
+  their confidence, virtual classification requires explicit sysfs evidence,
+  and Ray discovery validates markers before dispatch, cancels failed probes,
+  and has deterministic tests plus a same-host two-node smoke check.
+
+- The Dynamo configuration is derived from the pinned contract through
+  `DynamoConfig.from_contract()`, with declared adapter and caller ownership
+  lists, so the contract stays the single source of truth instead of being
+  copied into field defaults.
 
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
-  the V1.1 device inventory.
+  the V1.1 device inventory
+  ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
+- Ray is pinned to 2.55.0 because Dynamo 1.4.2's vLLM dependency requires Ray
+  2.55.0 or newer
+  ([PR #9](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/9)).
 
 ### Known limitations
 
@@ -27,14 +104,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- NIC affinity and inter-node bandwidth or latency are not discovered.
+- GPU-to-NIC affinity and inter-node bandwidth or latency are not discovered.
+  The NIC inventory reports advertised link speed from Linux sysfs only; that
+  is not measured throughput, and virtualized hosts often leave PCI, NUMA, or
+  speed unavailable.
 
 ### Planned
 
-- NVIDIA Dynamo integration is tracked in
-  [issues 1–3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues).
+- Dynamo image-build and real-GPU validation remain tracked in
+  [issue #3](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/3).
 
 ## [0.1.1] - 2026-09-14
+
+Source: [tagged commit 9dcb40f](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/9dcb40f13d2d836a444ab0ddabfd53d03ba31266).
 
 ### Added
 
@@ -65,6 +147,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - NVIDIA Dynamo integration is not implemented in this release.
 
 ## [0.1.0] - 2026-09-13
+
+Source: [tagged commit 4db520f](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/4db520f6343fcc4e7ecee086a811328ddee6bbc9).
 
 ### Added
 
