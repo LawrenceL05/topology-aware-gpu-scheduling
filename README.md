@@ -104,6 +104,7 @@ evidence required for completion. Track live assignments and progress in
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
 - **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
 - **[NIC inventory](topology_scheduler/nic_inventory.py)**: reads each node's interfaces, their PCI function, NUMA node, driver, state, advertised speed, and RDMA devices, with per-field confidence; see the **[guide](docs/nic-inventory.md)** and run `python -m examples.nic_inventory`.
+- **[Dynamo GPU validation](docs/dynamo-gpu-validation.md)**: `python -m examples.dynamo_dry_run` shows the launch intent on any machine, and `python -m examples.dynamo_gpu_validation --run` is the opt-in real-GPU harness. No run report exists yet, so Dynamo serving remains unverified.
 - **[V1 Dynamo contract](docs/dynamo-v1-contract.md)**: pins the Ray, Dynamo, vLLM, Python, CUDA, driver, Linux, model, ownership, readiness, and shutdown contract for independent single-GPU replicas.
 
 ```bash

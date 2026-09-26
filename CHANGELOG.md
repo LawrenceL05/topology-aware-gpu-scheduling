@@ -83,6 +83,14 @@ published release. See [current status and validation](docs/current-status.md).
   lists, so the contract stays the single source of truth instead of being
   copied into field defaults.
 
+- A CPU-only Dynamo dry run that prints the plan, replica configuration, and
+  launch intent without touching Ray, Dynamo, or a GPU, and an opt-in real-GPU
+  validation harness that skips with explicit reasons when prerequisites are
+  missing, exercises rollback, planned-versus-actual placement, repeated
+  completions on one reservation, and shutdown, and records hardware, versions,
+  commands, timings, and per-step status into a run report. No run report
+  exists yet, so Dynamo serving stays GPU-unverified.
+
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
