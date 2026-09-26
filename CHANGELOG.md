@@ -11,6 +11,10 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Added
 
+- Matched serial job traces across all five reference policies, terminal failure
+  records, observed GPU-count JCT normalization, shared execution conformance
+  tests, and a simulated two-node Ray comparison example
+  ([PR #34](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/34)).
 - A concise V1.2 workflow covering discovery, planner inputs, node placement,
   Ray reservation, execution, and cleanup, with explicit device-enforcement
   and validation boundaries
