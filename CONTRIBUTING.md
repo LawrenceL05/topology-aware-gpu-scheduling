@@ -30,6 +30,39 @@ issue in Next Release; it keeps its original research milestone. Maintainers
 review completion evidence before closing milestones and set due dates only
 when estimates, hardware availability, and dependencies justify them.
 
+### Group and title issues
+
+Use exactly one lowercase prefix in each issue title, chosen by the primary
+deliverable: `[type] Clear description of the outcome`.
+
+| Prefix | Use for | Example title |
+| --- | --- | --- |
+| `[bug]` | Existing behavior that is incorrect or broken | `[bug] Release GPU reservations after worker failure` |
+| `[feature]` | A new capability | `[feature] Support topology-aware placement` |
+| `[maintenance]` | Dependencies, CI, cleanup, or refactoring | `[maintenance] Update Ray dependency` |
+| `[docs]` | Guides, examples, or explanations | `[docs] Clarify multi-node setup` |
+| `[research]` | Investigating a question or comparing approaches | `[research] Compare placement scoring methods` |
+| `[benchmark]` | Measuring performance or validating results | `[benchmark] Measure JCT on two GPU nodes` |
+
+Choose the issue's main purpose rather than every activity it involves. A bug
+fix that includes regression tests and documentation still uses `[bug]`.
+Use `[research]` when the main output is a finding or recommendation, and
+`[benchmark]` when it is a set of performance measurements. These titles are
+examples, not claims about current capabilities or planned work.
+
+Keep priority and status in labels or project fields, and target deliverables
+or releases in milestones. The prefix describes the kind of work; it does not
+replace the milestone and dependency requirements above. If the scope changes,
+update the prefix to match the new primary deliverable.
+
+Include these three items in every issue, alongside the relevant bug-report,
+feature-request, or research evidence details:
+
+- **Why it matters:** the problem, question, or motivation.
+- **Scope:** the work included and any boundaries or dependencies.
+- **Done when:** observable acceptance criteria, such as a reproducible fix,
+  an updated guide, a documented finding, or a benchmark with its methodology.
+
 ## Set up the project
 
 Python 3.10 or newer is required. From a clone of the repository:
