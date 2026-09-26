@@ -19,16 +19,22 @@ from .nic_inventory import (
     NetworkInterface, NodeNICInventory, RDMADevice, Reading, SysfsReader,
     collect_nic_inventory, discover_nic_inventory,
 )
+from .host_topology import (
+    GPULocality, HostNIC, HostTopology, NICProximity, Proximity,
+    collect_host_topology, discover_host_topology, normalize_pci_address,
+)
 
 __all__ = [
     "DynamoConfig", "DynamoService", "DynamoLifecycleError", "DynamoCleanupError",
-    "ClusterNode", "ExecutionRecord", "GPUConnection", "GPUDevice", "KAIStatus",
-    "KAIWorkload", "KubernetesKAIClient", "NetworkInterface",
+    "ClusterNode", "ExecutionRecord", "GPUConnection", "GPUDevice",
+    "GPULocality", "HostNIC", "HostTopology", "KAIStatus",
+    "KAIWorkload", "KubernetesKAIClient", "NICProximity", "NetworkInterface",
     "NodeNICInventory", "PodState", "RDMADevice", "Reading", "SysfsReader",
-    "Node", "Plan",
+    "Node", "Plan", "Proximity",
     "PlanningRecord", "PolicyName", "RayNodeInventory", "RecordedExecutionError",
     "Workload", "build_kai_objects", "cancel", "choose_placement",
-    "collect_nic_inventory", "discover_nic_inventory",
+    "collect_host_topology", "collect_nic_inventory", "discover_host_topology",
+    "discover_nic_inventory", "normalize_pci_address",
     "discover_planner_nodes", "preflight", "run_kai", "status", "submit",
     "discover_ray_gpu_inventory", "plan_with_record", "run_with_record",
     "validate_submission",

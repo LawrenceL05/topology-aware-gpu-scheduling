@@ -17,6 +17,12 @@ and representing it in a typed topology graph is
 [issue #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16).
 Neither inventory nor graph relationships enforce placement or select a NIC.
 
+This inventory is also the interface half of
+[GPU, NUMA, and NIC host locality](host-topology.md), which adds each PCI
+function's ancestry and decides which interface sits nearest to a GPU. That
+collector re-reads nothing: it consumes these records with their provenance
+intact.
+
 ```mermaid
 flowchart LR
     R[Live Ray nodes with a topology marker] --> P[One pinned probe per node]
