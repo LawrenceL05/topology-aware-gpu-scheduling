@@ -19,8 +19,14 @@ from .nic_inventory import (
     NetworkInterface, NodeNICInventory, RDMADevice, Reading, SysfsReader,
     collect_nic_inventory, discover_nic_inventory,
 )
+from .device_binding import (
+    DeviceAssignment, DeviceBindingError, DevicePlacement, device_resources,
+    run_with_devices,
+)
 
 __all__ = [
+    "DeviceAssignment", "DeviceBindingError", "DevicePlacement",
+    "device_resources", "run_with_devices",
     "DynamoConfig", "DynamoService", "DynamoLifecycleError", "DynamoCleanupError",
     "ClusterNode", "ExecutionRecord", "GPUConnection", "GPUDevice", "KAIStatus",
     "KAIWorkload", "KubernetesKAIClient", "NetworkInterface",
