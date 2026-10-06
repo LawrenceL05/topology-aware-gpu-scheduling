@@ -1,4 +1,4 @@
-"""Two local Ray nodes on one host; tests link-probe orchestration only."""
+"""Host-local TCP probes and matched traces with simulated logical GPUs."""
 import json
 import sys
 
@@ -6,9 +6,14 @@ import ray
 from ray.cluster_utils import Cluster
 
 from topology_scheduler import (
-    Node, ProbeParameters, Workload, measure_ray_links, plan_with_record,
-    resolve_link_costs,
+    Node, ProbeParameters, TraceJob, Workload, measure_ray_links, plan_with_record,
+    resolve_link_costs, run_matched_trace,
 )
+
+
+def worker(rank):
+    assert len(ray.get_gpu_ids()) == 1
+    return rank
 
 
 def main():
@@ -17,7 +22,7 @@ def main():
     cluster = Cluster()
     try:
         for name in ("a", "b"):
-            cluster.add_node(num_cpus=1, include_dashboard=False,
+            cluster.add_node(num_cpus=1, num_gpus=1, include_dashboard=False,
                              resources={f"topology_node:{name}": 1})
         ray.init(address=cluster.address)
         report = measure_ray_links(
@@ -48,8 +53,21 @@ def main():
             link_costs=resolution.costs,
         )
         assert planning.inputs["bandwidth_sources"]["a|b"]["source"] == "measured"
-        print(json.dumps({"host_local_only": True, "report": report.as_dict(),
-                          "planning": planning.as_dict()}, indent=2))
+        traces = run_matched_trace(
+            [Node(name, "SIMULATED", 1, 80) for name in ("a", "b")],
+            [TraceJob("local-probe-wiring", Workload(2, 1, {"SIMULATED": 1}, 1), worker)],
+            resolution.bandwidth_gbps, accelerator_type="SIMULATED",
+            link_costs=resolution.costs, reservation_timeout=30, execution_timeout=30,
+        )
+        assert len(traces) == 5
+        for trace in traces:
+            assert trace.status == "succeeded", trace.as_dict()
+            assert trace.execution.backend == "ray"
+            assert trace.planning.inputs["bandwidth_sources"] == planning.inputs["bandwidth_sources"]
+        print(json.dumps({"host_local_only": True, "simulated_logical_gpus": True,
+                          "performs_cuda_work": False, "report": report.as_dict(),
+                          "planning": planning.as_dict(),
+                          "traces": [trace.as_dict() for trace in traces]}, indent=2))
     finally:
         ray.shutdown()
         cluster.shutdown()

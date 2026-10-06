@@ -4,7 +4,7 @@ from .policy import Node, Plan, PolicyName, Workload, choose_placement
 from .dynamo_backend import DynamoConfig, DynamoService, DynamoLifecycleError, DynamoCleanupError
 from .comparison import (
     ExecutionRecord, PlanningRecord, RecordedExecutionError, plan_with_record,
-    run_with_record,
+    TraceJob, TraceRecord, run_matched_trace, run_with_record,
 )
 from .inventory import (
     GPUConnection, GPUDevice, RayNodeInventory, discover_planner_nodes,
@@ -38,5 +38,5 @@ __all__ = [
     "submit", "discover_ray_gpu_inventory", "plan_with_record", "run_with_record",
     "NetworkInterface", "NodeNICInventory", "RDMADevice", "Reading",
     "SysfsReader", "collect_nic_inventory", "discover_nic_inventory",
-    "validate_submission",
+    "validate_submission", "TraceJob", "TraceRecord", "run_matched_trace",
 ]

@@ -189,10 +189,33 @@ Without `link_costs`, each value is recorded as `supplied` by the caller.
 from `run_with_record()` embed the planning record, so they carry the same
 sources.
 
+The matched trace API accepts the same optional mapping:
+
+```python
+from topology_scheduler import TraceJob, run_matched_trace
+
+records = run_matched_trace(
+    nodes, [TraceJob("job-001", workload, worker)], resolution.bandwidth_gbps,
+    accelerator_type="H100", link_costs=resolution.costs,
+)
+```
+
+It checks that the cost keys and values match before planning or execution,
+then holds a copy of both mappings fixed across all five policies. Successful
+jobs, planning failures, and execution failures all retain `bandwidth_sources`,
+including measurement timestamps. The mapping is recording metadata, not a
+backend option. Caller changes to the original mappings cannot change a later
+policy's inputs or an earlier record.
+
+Resolve TTL/freshness immediately before starting a controlled comparison.
+The trace runner does not remeasure or refresh costs between jobs; record the
+measurement age and experimental window when interpreting a long trace.
+
 ## Run it without a cluster
 
 ```bash
 python -m unittest tests.test_links -v
+python -m unittest tests.test_trace_link_provenance -v
 python -m examples.ray_link_smoke
 ```
 
@@ -209,7 +232,9 @@ and advertised-cost provenance. They require no physical NIC hardware.
 
 [The Ray smoke example](../examples/ray_link_smoke.py) starts two Ray nodes on
 one host, measures both directions through the real actor and task
-orchestration, and plans with the result. Its traffic never leaves the host; it
+orchestration, plans with the result, and executes all five policies with that
+same measured provenance and simulated logical GPUs. It performs no CUDA work.
+Its traffic never leaves the host; it
 tests orchestration, not a network. On Linux it also asserts that both endpoint
 workers returned NIC collector evidence from real sysfs. Other platforms retain
 explicit unsupported-lookup diagnostics.
