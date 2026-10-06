@@ -11,6 +11,15 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Added
 
+- Matched serial job traces across all five reference policies, terminal failure
+  records, observed GPU-count JCT normalization, shared execution conformance
+  tests, and a simulated two-node Ray comparison example
+  ([PR #34](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/34)).
+- A concise V1.2 workflow covering discovery, planner inputs, node placement,
+  Ray reservation, execution, and cleanup, with explicit device-enforcement
+  and validation boundaries
+  ([PR #8](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/8)).
+
 - A reproducible single-GPU validation report and workflow covering physical
   NVML inventory, Ray GPU assignment, oversubscription rejection, baseline
   policies, backend contract suites, and a direct CUDA smoke test. Multi-GPU,
@@ -20,7 +29,9 @@ published release. See [current status and validation](docs/current-status.md).
   deterministic serialization, legacy GPU inventory loading, affinity queries,
   collector-snapshot adapters with identity/conflict validation, and a CPU
   example that also reads exported snapshots. Integration tests exercise the
-  merged NIC collector with sysfs fixtures. Automatic affinity discovery and
+  merged NIC collector with sysfs fixtures. Host snapshots accept current
+  Reading-based NIC fields and earlier scalar fields, retain raw confidence,
+  and reject inconsistent reported/normalized PCI identities. Automatic affinity discovery and
   backend device binding remain separate work
   ([PR #28](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/28)).
 - A persistent Ray-managed Dynamo replica adapter with atomic reservations,

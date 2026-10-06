@@ -149,8 +149,16 @@ Collectors should retain these exported fields, or coordinate a schema update:
 | --- | --- |
 | GPU inventory | `node_id`, `devices[].uuid`, `devices[].pci_bus_id`, legacy `connections` |
 | NIC inventory | `node_id`, `interfaces[].name`, `pci_address` and `numa_node` Reading objects with `value`/`confidence` |
-| Host topology | `node_id`, `nics[].name/pci_address/numa_node`, `gpus[].uuid/pci_address/numa_node/nics` |
+| Host topology | `node_id`, `nics[].name`, NIC `pci_address`/`numa_node` Reading objects, optional `normalized_pci_address`, and `gpus[].uuid/pci_address/numa_node/nics` |
 | GPU's NIC proximity | `nic_name`, `proximity`, `shared_pci_ancestor`, optional `reason` |
+
+The current `HostNIC.as_dict()` export retains the NIC inventory's Reading
+objects and adds `normalized_pci_address` and `pci_path`. Only readings marked
+`reported` supply known PCI/NUMA identities. A normalized address must agree
+with a reported raw PCI address and never upgrades an unknown reading. The
+earlier host snapshot's scalar PCI/NUMA fields remain supported. All original
+fields and their confidence/source information survive in graph attributes;
+GPU locality fields remain scalars in both host formats.
 
 NICs join by interface name within the same Ray node and get keys
 `interface:<name>`. Two interfaces on the same PCI function remain distinct;
@@ -194,6 +202,15 @@ It checks attached and unmatched RDMA evidence, advertised speed, diagnostics,
 unreadable/unsupported fields, NUMA membership, and affinity ties when a locality
 fixture is supplied. This is collector integration coverage without physical
 hardware; it does not validate live GPU-to-NIC proximity.
+
+Reading-shaped host fixtures cover standalone host snapshots, joins with NIC
+inventory, conflicting identities, unknown readings, and PCI domain formatting.
+A separate local check used PR #29's actual collector at commit
+`31a301f1958adb5b5f5d5f26f72f8aed8bc0115a` with its sysfs fixtures: multiple
+NUMA domains and tied NICs, unreadable NUMA, and missing PCI/virtual interfaces
+all converted through object and JSON inputs and round-tripped successfully.
+This is compatibility evidence for that pinned collector revision, not a new
+runtime dependency or hardware validation. The collector remains in PR #29.
 
 From the repository root, run:
 

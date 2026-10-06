@@ -65,6 +65,24 @@ def _same_pci(left, right):
     return canonical(left) == canonical(right)
 
 
+def _host_nic_value(record, field):
+    """Read current HostNIC Reading fields or the earlier scalar snapshot."""
+    value = record.get(field)
+    return _reported(record, field) if isinstance(value, dict) else value
+
+
+def _host_nic_pci(record):
+    address = _host_nic_value(record, "pci_address")
+    # Normalization changes representation, not confidence. An unreported raw
+    # Reading cannot become known merely because a normalized field exists.
+    if not address:
+        return None
+    normalized = record.get("normalized_pci_address")
+    if normalized and not _same_pci(address, normalized):
+        raise ValueError(f"Conflicting normalized PCI identity for NIC {record['name']}")
+    return normalized or address
+
+
 def graph_from_observations(gpu_inventory, nic_inventory, host_topology):
     gpu = _snapshot(gpu_inventory, "gpu_inventory")
     base = TopologyGraph.from_legacy(gpu)
@@ -112,9 +130,10 @@ def graph_from_observations(gpu_inventory, nic_inventory, host_topology):
         observed, located = interfaces.get(name), host_nics.get(name)
         attrs = {"name": name, "identity_scope": "node-local interface name"}
         observed_numa = _numa(_reported(observed, "numa_node")) if observed else None
-        located_numa = _numa(located.get("numa_node")) if located else None
+        located_numa = _numa(_host_nic_value(located, "numa_node")) if located else None
+        located_pci = _host_nic_pci(located) if located else None
         if observed and located:
-            observed_pci, located_pci = _reported(observed, "pci_address"), located.get("pci_address")
+            observed_pci = _reported(observed, "pci_address")
             if observed_pci and located_pci and not _same_pci(observed_pci, located_pci):
                 raise ValueError(f"Conflicting PCI identity for NIC {name}")
             if observed_numa is not None and located_numa is not None and observed_numa != located_numa:

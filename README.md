@@ -63,8 +63,8 @@ adds a workload-specific policy for choosing among feasible placements; Ray
 still performs resource accounting and task execution. See [Ray accelerator
 support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html).
 
-See **[V1.1 workflow](docs/v1.1-workflow.md)** for the full order from cluster
-startup and GPU discovery through planning, reservation, execution, and cleanup.
+See **[V1.2 workflow](docs/v1.2-workflow.md)** for the full order from cluster
+startup and topology discovery through planning, reservation, execution, and cleanup.
 The **[V1.2 topology guide](docs/v1.2-topology-discovery.md)** explains the new
 GPU relationship graph and its current enforcement boundary. The
 **[single-GPU validation report](docs/one-gpu-validation.md)** records the first
@@ -75,19 +75,25 @@ node entities with separate evidence-bearing relationships and affinity queries.
 Run `python -m examples.topology_graph` for a synthetic, GPU-free example.
 `TopologyGraph.from_observations()` adapts exported GPU/NIC/locality snapshots
 from the separate collectors, preserving their evidence and rejecting identity
-conflicts. The example also accepts snapshot JSON files. Graph queries do not
+conflicts. Both current host NIC Reading fields and earlier scalar snapshots
+are supported. The example also accepts snapshot JSON files. Graph queries do not
 change planner scores or bind devices in Ray or KAI.
 
 ## Evaluation
 
-Normalized JCT is the stated evaluation metric. The exact normalization baseline, job boundaries, aggregation method, hardware configurations, and workload definitions will be documented with the experiment artifacts to support reproducible comparisons.
+The matched trace runner normalizes each successful job's observed JCT by the
+same job's successful `gpu_count` run. The [baseline guide](docs/baseline-policies.md)
+defines the timing boundary and failure handling. Real experiments must also
+record aggregation, hardware, workload definitions, and matched conditions;
+the synthetic trace example is not performance evidence.
 
 ## Repository Status
 
 This repository includes an initial Python placement policy, automatic
 intra-node GPU topology discovery, a network interface inventory, a Ray
 execution adapter, and a KAI Scheduler lifecycle adapter. It is an experimental
-foundation: real GPU benchmarks, workload traces, automatic GPU-to-NIC affinity discovery, and
+foundation: real GPU benchmarks, real-workload traces, automatic GPU-to-NIC
+affinity discovery, and
 measured inter-node links are not yet included. The
 [Dynamo lifecycle adapter](docs/dynamo-lifecycle.md) has CPU/fake-engine coverage;
 real Dynamo/CUDA inference remains unverified.
@@ -125,7 +131,11 @@ The smoke example runs real Ray with simulated logical GPUs; it performs no CUDA
 Five deterministic **[reference baseline policies](docs/baseline-policies.md)**
 now support controlled comparisons through one planner interface and the same
 Ray execution path. Run `python -m examples.compare_policies` to inspect their
-machine-readable decisions on synthetic inputs.
+machine-readable decisions on synthetic inputs. Run `python -m
+examples.compare_policy_traces` to replay a shared serial job trace across all
+five policies on two local Ray nodes with simulated GPUs. It records terminal
+failures and matched GPU-count JCT ratios; these are integration checks, not
+benchmark results.
 
 The **[KAI Scheduler integration](docs/kai-integration.md)** maps the same
 backend-neutral plan to an external KAI PodGroup and node-pinned GPU Pods. It

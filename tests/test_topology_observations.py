@@ -207,6 +207,67 @@ class ObservationAdapterTests(unittest.TestCase):
         self.assertEqual(graph.to_json(), from_dict.to_json())
         self.assertEqual(TopologyGraph.from_json(graph.to_json()).to_json(), graph.to_json())
 
+    def use_reading_host_nics(self):
+        # HostNIC.as_dict() from PR #29 exports NetworkInterface readings,
+        # with normalized_pci_address and pci_path added alongside them.
+        self.host["nics"] = [
+            dict(deepcopy(interface), normalized_pci_address=interface["pci_address"]["value"],
+                 pci_path=["pci0000:00", interface["pci_address"]["value"]])
+            for interface in self.nic["interfaces"]
+        ]
+
+    def test_reading_host_nics_join_with_nic_inventory_and_preserve_evidence(self):
+        self.use_reading_host_nics()
+        graph = self.graph()
+        gpu = TopologyVertex("gpu", "node-a", "GPU-a").id
+        self.assertEqual([v.attributes["name"] for v in graph.nics_near_gpu(gpu)], ["eth0", "eth1"])
+        for vertex in (v for v in graph.vertices if v.kind == "nic"):
+            self.assertEqual(vertex.attributes["host_topology"], next(
+                n for n in self.host["nics"] if n["name"] == vertex.attributes["name"]))
+        self.assertEqual(TopologyGraph.from_json(graph.to_json()).to_json(), graph.to_json())
+
+    def test_reading_host_only_snapshot_creates_reported_numa_membership(self):
+        self.use_reading_host_nics()
+        graph = TopologyGraph.from_observations(self.inventory, host_topology=self.host)
+        nic_ids = {v.id for v in graph.vertices if v.kind == "nic"}
+        memberships = [e for e in graph.relationships if e.kind == "numa_locality" and e.source in nic_ids]
+        self.assertEqual(len(memberships), 3)
+        self.assertEqual({graph.vertex(e.target).key for e in memberships}, {"0", "1"})
+
+    def test_unknown_host_readings_do_not_create_numa_or_known_identity_conflicts(self):
+        self.use_reading_host_nics()
+        for nic in self.host["nics"]:
+            nic["numa_node"] = reading(99, "unreadable")
+            nic["pci_address"] = reading("0000:ff:00.0", "unsupported")
+            nic["normalized_pci_address"] = "0000:ff:00.0"
+        self.graph()  # Unknown readings cannot conflict with a reported snapshot.
+        graph = TopologyGraph.from_observations(self.inventory, host_topology=self.host)
+        nic_ids = {v.id for v in graph.vertices if v.kind == "nic"}
+        self.assertFalse(any(e.kind == "numa_locality" and e.source in nic_ids for e in graph.relationships))
+        self.assertNotIn("99", {v.key for v in graph.vertices if v.kind == "numa"})
+
+    def test_reading_host_known_conflicts_are_rejected(self):
+        self.use_reading_host_nics()
+        original = deepcopy(self.host["nics"][0])
+        for changes in (
+            {"numa_node": reading(9)},
+            {"pci_address": reading("0000:ff:00.0"), "normalized_pci_address": "0000:ff:00.0"},
+            {"normalized_pci_address": "0000:ff:00.0"},
+        ):
+            with self.subTest(changes=changes):
+                self.host["nics"][0] = dict(original, **changes)
+                with self.assertRaisesRegex(ValueError, "Conflicting"):
+                    self.graph()
+
+    def test_reading_host_normalized_domain_and_missing_normalization_are_compatible(self):
+        self.use_reading_host_nics()
+        self.host["nics"][0]["pci_address"] = reading("00000000:02:00.0")
+        self.host["nics"][1].pop("normalized_pci_address")
+        graph = self.graph()
+        expected = graph.to_json()
+        self.host["nics"].reverse()
+        self.assertEqual(self.graph().to_json(), expected)
+
     def test_partial_nic_collector_output_does_not_invent_locality(self):
         from topology_scheduler.nic_inventory import collect_nic_inventory
         from tests.test_nic_inventory import DENIED, INVALID, ETHERNET, FakeSysfs, net
