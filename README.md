@@ -79,13 +79,19 @@ defines the timing boundary and failure handling. Real experiments must also
 record aggregation, hardware, workload definitions, and matched conditions;
 the synthetic trace example is not performance evidence.
 
+Measured link costs can be supplied to the trace runner with
+`link_costs=resolution.costs`. Every policy's success and failure records retain
+the same bandwidth snapshot and its measured, advertised, fallback, or supplied
+source; see the [link measurement guide](docs/link-measurement.md).
+
 ## Repository Status
 
 This repository includes an initial Python placement policy, automatic
-intra-node GPU topology discovery, a network interface inventory, a Ray
-execution adapter, and a KAI Scheduler lifecycle adapter. It is an experimental
-foundation: real GPU benchmarks, real-workload traces, GPU-to-NIC affinity, and
-measured inter-node links are not yet included. The
+intra-node GPU topology discovery, a network interface inventory, opt-in
+inter-node TCP link measurement, a Ray execution adapter, and a KAI Scheduler
+lifecycle adapter. It is an experimental foundation: real GPU benchmarks,
+real-workload traces, GPU-to-NIC affinity, and physical multi-node link validation
+are not yet included. The
 [Dynamo lifecycle adapter](docs/dynamo-lifecycle.md) has CPU/fake-engine coverage;
 real Dynamo/CUDA inference remains unverified.
 
@@ -109,6 +115,7 @@ evidence required for completion. Track live assignments and progress in
 - **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
 - **[NIC inventory](topology_scheduler/nic_inventory.py)**: reads each node's interfaces, their PCI function, NUMA node, driver, state, advertised speed, and RDMA devices, with per-field confidence; see the **[guide](docs/nic-inventory.md)** and run `python -m examples.nic_inventory`.
 - **[V1 Dynamo contract](docs/dynamo-v1-contract.md)**: pins the Ray, Dynamo, vLLM, Python, CUDA, driver, Linux, model, ownership, readiness, and shutdown contract for independent single-GPU replicas.
+- **[Inter-node link measurement](docs/link-measurement.md)**: opt-in TCP throughput and latency probes between Ray nodes, with NIC collector evidence on each endpoint and planner bandwidth provenance; missing identity stays explicit.
 
 ```bash
 python -m pip install -e '.[ray]'
@@ -147,8 +154,9 @@ nodes = discover_planner_nodes()
 plan = choose_placement(nodes, Workload(2, 40, {"H100": 10}), {})
 ```
 
-The workload profile and inter-node network bandwidth remain explicit
-experimental inputs; they are not GPU hardware facts. Run
+The workload profile remains an explicit experimental input, not a GPU hardware
+fact. Inter-node bandwidth is supplied as well, unless a controlled
+[link measurement](docs/link-measurement.md) run produces it. Run
 `python -m examples.ray_inventory` to print the detected hardware and
 intra-node graph. Each GPU node must advertise exactly one
 `topology_node:<name>` custom resource. The current Ray adapter reserves a node

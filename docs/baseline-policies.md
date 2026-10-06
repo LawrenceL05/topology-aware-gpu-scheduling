@@ -68,6 +68,12 @@ Jobs run serially, and each policy completes the whole trace before the next
 policy starts. This does not simulate an arrival schedule or concurrent queue.
 There are no retries. Planning failures and backend exceptions produce terminal
 records and subsequent jobs still run; process interrupts propagate.
+When using [resolved network measurements](link-measurement.md), pass
+`link_costs=resolution.costs` with `resolution.bandwidth_gbps`. The runner
+validates and snapshots both mappings before any job runs. Every success or
+failure record retains the same per-link source and measurement timestamp;
+omitting the metadata labels caller-provided values as `supplied`. Resolve
+freshness before the trace; measurements are not refreshed between policies.
 Custom backends must perform cleanup on success and failure, as required by the
 shared execution contract. Ray requests placement-group removal asynchronously;
 the next job waits for its own reservation before launching workers.
