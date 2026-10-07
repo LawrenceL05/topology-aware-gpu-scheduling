@@ -227,7 +227,9 @@ evidence, canonical serialization, multiple nodes/domains/NICs, and ties.
 Observed topology, derived affinity, planner preference, and backend enforcement
 remain separate. Neither the policy nor Ray/KAI binds workers to GPU/NIC IDs
 from this graph. No policy weight, reservation, or runtime dependency changes.
-Active measurements belong to
-[#17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17);
-future measured edges need direction, units, timestamps, and provenance without
-replacing the physical observations represented here.
+The separate [link measurement API](link-measurement.md), implemented in
+[PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27),
+retains directional TCP evidence and supplies planner costs with provenance.
+Those costs are not graph affinity categories. Future measured graph edges
+need direction, units, timestamps, and provenance without replacing the
+physical observations represented here.

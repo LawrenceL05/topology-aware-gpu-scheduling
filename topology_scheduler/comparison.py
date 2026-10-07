@@ -1,9 +1,11 @@
 """Machine-readable planning, execution, and matched trace comparisons."""
 
 from dataclasses import dataclass, replace
+from math import isclose
 from time import perf_counter_ns
 from typing import Callable, Iterable, Mapping
 
+from .links import LinkCost, LinkCostSource
 from .policy import Node, Plan, PolicyName, Workload, choose_placement
 
 
@@ -63,8 +65,15 @@ def plan_with_record(
     bandwidth_gbps: Mapping[tuple[str, str], float], *,
     policy: PolicyName | str,
     accelerator_type: str | None = None,
+    link_costs: Mapping[tuple[str, str], LinkCost] | None = None,
 ) -> tuple[Plan, PlanningRecord]:
-    """Plan once and capture the inputs, decision, score, and timing boundary."""
+    """Plan once and capture the inputs, decision, score, and timing boundary.
+
+    ``link_costs``, as returned by ``resolve_link_costs``, records whether each
+    bandwidth value was measured, advertised, or a fallback. Without it every
+    value is recorded as supplied by the caller.
+    """
+    _validate_link_costs(bandwidth_gbps, link_costs)
     started = perf_counter_ns()
     plan = choose_placement(
         nodes, workload, bandwidth_gbps, policy=policy,
@@ -73,7 +82,7 @@ def plan_with_record(
     finished = perf_counter_ns()
     return plan, PlanningRecord(
         policy=plan.policy_name,
-        inputs=_planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type),
+        inputs=_planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type, link_costs),
         chosen_placement=tuple(node.name for node in plan.workers),
         estimated_seconds=plan.estimated_seconds,
         planning_started_ns=started,
@@ -81,7 +90,16 @@ def plan_with_record(
     )
 
 
-def _planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type):
+def _validate_link_costs(bandwidth_gbps, link_costs):
+    if link_costs is not None and (
+        set(link_costs) != set(bandwidth_gbps)
+        or any(not isclose(link_costs[pair].gb_per_second, value)
+               for pair, value in bandwidth_gbps.items())
+    ):
+        raise ValueError("link_costs must describe exactly the supplied bandwidth values")
+
+
+def _planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type, link_costs=None):
     return {
         "nodes": [
             {
@@ -101,6 +119,13 @@ def _planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type):
         "bandwidth_gbps": {
             f"{left}|{right}": value
             for (left, right), value in sorted(bandwidth_gbps.items())
+        },
+        "bandwidth_sources": {
+            f"{left}|{right}": (
+                link_costs[(left, right)].provenance() if link_costs is not None
+                else {"source": LinkCostSource.SUPPLIED.value, "measured_at": None}
+            )
+            for left, right in sorted(bandwidth_gbps)
         },
         "accelerator_type": accelerator_type,
     }
@@ -199,7 +224,9 @@ class TraceRecord:
 def run_matched_trace(
     nodes: list[Node], jobs: Iterable[TraceJob],
     bandwidth_gbps: Mapping[tuple[str, str], float], *,
-    accelerator_type: str, backend=None, **backend_options,
+    accelerator_type: str, backend=None,
+    link_costs: Mapping[tuple[str, str], LinkCost] | None = None,
+    **backend_options,
 ) -> list[TraceRecord]:
     """Replay one ordered, serial trace for each of the five reference policies.
 
@@ -208,6 +235,12 @@ def run_matched_trace(
     return (including cleanup). Planning/execution failures are retained and the
     trace continues without retries. Interrupts still propagate. Callers own
     cluster isolation, warmup, workload seeds, and experimental metadata.
+
+    Optional ``link_costs`` records the provenance of every bandwidth value.
+    Both maps are copied and checked before any work runs, then held fixed for
+    all policies, including planning/execution failure records. Resolve report
+    freshness before starting the trace; this function does not run probes or
+    refresh costs between jobs.
     """
     jobs = tuple(jobs)
     if not jobs:
@@ -224,6 +257,8 @@ def run_matched_trace(
         raise ValueError("Trace backend must be 'ray' or a callable accepting rank workers")
 
     nodes, bandwidth_gbps = list(nodes), dict(bandwidth_gbps)
+    link_costs = None if link_costs is None else dict(link_costs)
+    _validate_link_costs(bandwidth_gbps, link_costs)
     jobs = tuple(replace(job, workload=replace(
         job.workload, compute_seconds_by_gpu=dict(job.workload.compute_seconds_by_gpu)
     )) for job in jobs)
@@ -235,13 +270,13 @@ def run_matched_trace(
             try:
                 plan, planning = plan_with_record(
                     nodes, job.workload, bandwidth_gbps,
-                    policy=policy, accelerator_type=constraint,
+                    policy=policy, accelerator_type=constraint, link_costs=link_costs,
                 )
             except Exception as error:
                 terminal = perf_counter_ns()
                 planning = PlanningRecord(
                     policy.value,
-                    _planning_inputs(nodes, job.workload, bandwidth_gbps, constraint),
+                    _planning_inputs(nodes, job.workload, bandwidth_gbps, constraint, link_costs),
                     (), None, submitted, terminal,
                 )
                 records.append(TraceRecord(
