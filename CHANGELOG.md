@@ -108,6 +108,12 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Changed
 
+- Align the release guide and roadmap with the existing upstream milestones,
+  requiring a review of selected scope and readiness evidence instead of
+  treating milestone creation as pending. Version and publication decisions
+  remain with maintainers
+  ([PR #39](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/39)).
+
 - Per-node Ray probes now return a complete GPU relationship graph alongside
   the V1.1 device inventory
   ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).

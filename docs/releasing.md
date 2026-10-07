@@ -83,12 +83,19 @@ The rules apply from the next release forward; earlier tags are not revised.
 
 ## What blocks a release
 
-Issue #18 proposes four milestones: Topology Discovery, Dynamo Integration,
-Evaluation, and Next Release. They do not exist in the repository yet. Once
-they do, only **Next Release** gates a tag: each issue in it must be closed, or
-moved out with a comment explaining the deferral, before the tag is created.
-Until the milestones exist, the release manager makes that judgment explicitly
-in the release pull request instead.
+The [roadmap](roadmap.md) defines the four existing upstream milestones:
+Topology Discovery, Dynamo Integration, Evaluation, and
+[Next Release](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/milestone/4).
+Use their [live GitHub state](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/milestones)
+when preparing a release; milestone creation is no longer pending.
+
+Only **Next Release** gates a tag: each issue in it must be closed, or moved
+out with a comment explaining the deferral, before the tag is created. Its
+release readiness issue records the selected scope, blocking dependencies,
+merged PRs, validation evidence, and deferred work. Keep research issues in
+their original milestones and link them from that readiness issue, as the
+roadmap requires. A completed issue counter alone does not establish readiness;
+a maintainer reviews the evidence against the selected scope.
 
 The research milestones do not block a release. Open experimental work is the
 normal state of this repository; it is disclosed under **Known limitations** in
@@ -114,8 +121,10 @@ logical GPUs, mocked backends, or synthetic inputs.
 Steps 1 through 9 happen on a branch and merge through an ordinary pull
 request. Nothing is tagged until step 11.
 
-1. Review the Next Release milestone. Close, or explicitly defer, every issue
-   in it.
+1. Review the live Next Release milestone and the readiness issue for this
+   release scope. Record the selected changes, dependencies, validation, and
+   deferrals; close, or explicitly defer, every issue in the milestone. Reuse
+   the existing milestone rather than creating a duplicate.
 2. Confirm the Tests workflow is green on `main`.
 3. Reconcile `CHANGELOG.md` against what actually merged since the previous
    tag. See [drafting release notes](#drafting-release-notes) for the commands
@@ -283,5 +292,7 @@ checklist rather than tagging the development value as-is.
 
 That candidate is a proposal, not a decision. It holds only if a review of the
 merged work confirms the changelog is complete and no incompatible change was
-missed, and the release still waits on the Next Release milestone from issue
-#18 being defined and cleared.
+missed. The existing Next Release milestone must still pass its readiness
+review and be cleared for the selected scope. Establishing milestones, closing
+the initial setup issue #18, or merging this guide does not approve a version,
+tag, or GitHub Release.
