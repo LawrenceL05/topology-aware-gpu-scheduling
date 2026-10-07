@@ -34,6 +34,9 @@ then [typed affinity graph #16](https://github.com/LawrenceL05/topology-aware-gp
 then [inter-node measurements #17](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/17).
 Issue #16 consumes both #14 and #15; #17 uses all three to identify and interpret
 measurement endpoints. Test design may proceed earlier using explicit fixtures.
+[Host locality](host-topology.md) consumes #14's inventory for the interface
+half of that mapping and adds only the PCI ancestry proximity needs, so the two
+collectors share one reader and one set of interface records.
 
 Exit criteria:
 

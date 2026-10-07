@@ -86,6 +86,15 @@ published release. See [current status and validation](docs/current-status.md).
   their confidence, virtual classification requires explicit sysfs evidence,
   and Ray discovery validates markers before dispatch, cancels failed probes,
   and has deterministic tests plus a same-host two-node smoke check.
+- GPU to NUMA and nearest-NIC mapping on each Ray node, built on that interface
+  inventory and adding each PCI function's ancestry, per-interface proximity
+  and its evidence, explicit unknown states with diagnostics, stable ordering
+  and serialization, and a runnable example
+  ([PR #29](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/29));
+  proximity is structural and is not a bandwidth claim. Missing PCI paths
+  remain unknown, reused inventories must match the node, and diagnostics are
+  sorted. Ray probes validate markers before submission and cancel submitted
+  work on failure.
 
 - The Dynamo configuration is derived from the pinned contract through
   `DynamoConfig.from_contract()`, with declared adapter and caller ownership
@@ -122,8 +131,13 @@ published release. See [current status and validation](docs/current-status.md).
   placement scoring.
 - NVML may not expose a topology property on every driver and GPU; unavailable
   relationship fields are reported as `None`.
-- GPU-to-NIC affinity is not derived. NIC inventory reports advertised speed,
-  not measured throughput; virtualized hosts may leave PCI, NUMA, or speed unknown.
+- The NIC inventory reports advertised link speed from Linux sysfs only; that
+  is not measured throughput, and virtualized hosts often leave PCI, NUMA, or
+  speed unavailable.
+- Host locality reads NUMA and interface data from Linux sysfs only, and keeps
+  unreadable or absent values as an explicit unknown. It observes proximity;
+  it does not bind a GPU to a NIC or feed placement scoring. A typed affinity
+  graph remains separate work.
 - Link measurement covers TCP over each node's Ray address. It is not RDMA,
   GPUDirect RDMA, or NCCL throughput, and the cost model does not use RTT.
   Matching probe addresses to interfaces is Linux primary-IPv4-only.
