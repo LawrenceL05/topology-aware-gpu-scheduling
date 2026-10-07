@@ -14,9 +14,11 @@ package versions. This roadmap creates no release or tag.
 
 ## Milestone definitions
 
-Create the following four milestones with these exact titles and descriptions.
-The descriptions are short enough to copy into GitHub; the exit criteria below
-explain the evidence needed to close each milestone.
+The following four milestones exist upstream. Reuse them and maintain their
+scope using these definitions; do not create duplicates. The descriptions are
+short enough to use in GitHub, and the exit criteria below explain the evidence
+needed to close each milestone. Consult the live milestone pages for membership
+and progress rather than treating this table as a status snapshot.
 
 | Title | GitHub description |
 | --- | --- |
@@ -152,26 +154,30 @@ rewriting its evidence.
 
 ## Dates and maintainer setup
 
-Leave all four due dates unset initially: no owner estimates, reserved hardware
-windows, or agreed release date currently justify deadlines. A maintainer may
-set a date after recording the owner, estimate or hardware reservation, resolved
+Keep due dates unset until an owner estimate, hardware window, or agreed release
+date justifies a deadline. A maintainer may set a date after recording the owner,
+estimate or hardware reservation, resolved
 dependencies, and agreement in the relevant issue. Revisit the date when those
 assumptions change, with a linked explanation; never infer it from an issue
 number, design milestone, or package version.
 
-Repository metadata is separate from files in a PR. Merging this guide does not
-create GitHub milestones or assign issues. A maintainer with the necessary
-upstream permissions completes this one-time setup:
+Repository metadata is separate from files in a PR. Initial milestone setup was
+tracked in [#18](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/18).
+Merging a documentation update does not change milestones or issue assignments.
+For ongoing triage or recovery of missing metadata, a maintainer with the
+necessary upstream permissions follows these steps:
 
 1. Open [upstream milestones](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/milestones),
    including closed milestones, and reuse matching titles rather than creating
    duplicates. Create missing milestones using the definitions above, leave due
    dates unset, and link this roadmap from each description for detailed exits.
-2. Apply the initial issue assignment map. Then review all currently open issues
-   for newer work; assign a milestone or record an explicit exception as above.
-3. Verify the live milestone descriptions and membership, and link that result
-   from #18. Keep #18 open until this repository setup and its other acceptance
-   criteria are complete. Milestones on a contributor's fork do not satisfy it.
+2. Review currently open issues; assign a milestone or record an explicit
+   exception as above. The initial assignment map is historical guidance, not
+   a reason to move completed research issues or overwrite later scope decisions.
+3. Verify live milestone descriptions and membership. Record subsequent release
+   scope and readiness evidence in that cycle's readiness issue; do not reuse
+   #18 as a release approval or overwrite prior readiness evidence. Milestones
+   on a contributor's fork do not replace the upstream milestones.
 
 For a read-only check using an authenticated GitHub CLI, run:
 
