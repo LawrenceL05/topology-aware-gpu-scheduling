@@ -156,8 +156,8 @@ rewriting its evidence.
 
 Keep due dates unset until an owner estimate, hardware window, or agreed release
 date justifies a deadline. A maintainer may set a date after recording the owner,
-estimate or hardware reservation, resolved
-dependencies, and agreement in the relevant issue. Revisit the date when those
+estimate or hardware reservation, resolved dependencies, and agreement in the
+relevant issue. Revisit the date when those
 assumptions change, with a linked explanation; never infer it from an issue
 number, design milestone, or package version.
 
