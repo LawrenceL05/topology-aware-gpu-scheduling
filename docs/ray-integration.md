@@ -28,6 +28,7 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
 | V1.2 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads NVIDIA devices and their pairwise relationships through NVML. |
 | Host locality | [host_topology.py](../topology_scheduler/host_topology.py) | Pins a probe to every live Ray GPU node and reads the PCI tree, NUMA nodes, and interfaces from sysfs to map each GPU to its nearest NIC. |
+| Link measurement | [links.py](../topology_scheduler/links.py) | Opt-in: pins a TCP probe server and client to each ordered node pair and normalizes the results into planner bandwidth. |
 | Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
 | Ray scheduling options | [scheduling_strategies.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/scheduling_strategies.py) | `PlacementGroupSchedulingStrategy` binds each task to its reserved bundle. |
 | Ray cluster placement scheduler | [gcs_placement_group_scheduler.cc](https://github.com/ray-project/ray/blob/ray-2.55.0/src/ray/gcs/gcs_server/gcs_placement_group_scheduler.cc) | Coordinates placement-group resource reservation across nodes. |
@@ -92,12 +93,14 @@ automatically generated data faithful to the existing one-model-per-node
 V1.2 extends the same probe with a complete undirected graph for the GPUs on
 each node. Every pair records its closest shared PCI/NUMA ancestor and the
 number of active direct NVLinks whose remote PCI identity is the other GPU.
-See [V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics
-and limitations.
+See the [V1.2 workflow](v1.2-workflow.md) for the end-to-end order and
+[V1.2 topology discovery](v1.2-topology-discovery.md) for field semantics and
+limitations.
 
 The collector obtains hardware topology only. Workload compute measurements,
-memory requirements, communication volume, and inter-node link bandwidth are
-still inputs to the experiment.
+memory requirements, and communication volume are still inputs to the
+experiment. Inter-node link bandwidth can be supplied or, opt-in, measured over
+TCP; see [inter-node link measurement](link-measurement.md).
 
 ## Cost model
 
@@ -195,6 +198,21 @@ different placement. Driver disconnect is separate from shutting down cluster
 nodes.
 
 ## Scope and next experiments
+
+The [matched trace harness](baseline-policies.md#executing-a-matched-trace)
+executes every reference policy through this unchanged adapter, using identical
+rank callables and timeout options. Its job terminal timestamp follows adapter
+return, including cleanup requests; placement-group removal is asynchronous,
+so this is not proof that physical resources were released at that timestamp.
+The next serial job still waits for its own atomic reservation. Run `python -m
+examples.compare_policy_traces` to verify success, worker failure, and subsequent
+reservation on two local Ray nodes with simulated GPUs. Its measured durations
+and normalized ratios are integration output, not inference performance evidence.
+Its optional `link_costs` argument records measured, advertised, fallback, or
+supplied bandwidth provenance for successes and failures across all policies.
+It is consumed by the trace runner and is not forwarded to the execution
+backend. The [link smoke](../examples/ray_link_smoke.py) exercises this path
+with host-local TCP measurements and simulated logical GPUs.
 
 This is a functional task-placement prototype, not a complete distributed LLM
 inference service. Each task requests one CPU and one GPU. Ray assigns the

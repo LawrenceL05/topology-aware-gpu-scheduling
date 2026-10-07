@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from topology_scheduler import GPUDevice
@@ -183,8 +184,48 @@ class InventoryReuseTests(TopologyFixture):
         self.assertTrue(any("no interfaces were found" in line
                             for line in topology.diagnostics))
 
+    def test_inventory_from_another_node_is_rejected(self):
+        reader = sysfs(self.LAYOUT)
+        inventory = collect_nic_inventory(sysfs=reader, node_id="other")
+        with self.assertRaisesRegex(ValueError, "node_id"):
+            collect_host_topology([device()], sysfs=reader, inventory=inventory)
+
+    def test_unreported_numa_value_cannot_establish_proximity(self):
+        reader = sysfs([
+            ((ROOT_COMPLEX, GPU_ADDRESS), 0, {}),
+            ((FAR_COMPLEX, "0000:81:00.0"), 0, {"eth0": ETH}),
+        ])
+        inventory = collect_nic_inventory(sysfs=reader)
+        inventory = replace(inventory, interfaces=tuple(
+            replace(nic, numa_node=replace(nic.numa_node, confidence=UNREADABLE))
+            if nic.name == "eth0" else nic for nic in inventory.interfaces))
+        topology = collect_host_topology([device()], sysfs=reader, inventory=inventory)
+        self.assertEqual(self.proximity(topology, "eth0").proximity, Proximity.UNKNOWN)
+        self.assertIsNone(self.nic(topology, "eth0").numa_node)
+
 
 class MissingEvidenceTests(TopologyFixture):
+    def test_missing_nic_pci_path_cannot_use_known_numa_or_same_device(self):
+        for address in ("0000:aa:00.0", "0000:17:00.1"):
+            with self.subTest(address=address):
+                reader = sysfs([((ROOT_COMPLEX, GPU_ADDRESS), 0, {})])
+                parts = ("sys", "class", "net", "eth9", "device")
+                reader.dirs.update({parts[:-1], parts})
+                reader.files[parts + ("uevent",)] = f"PCI_SLOT_NAME={address}\n"
+                reader.files[parts + ("numa_node",)] = "0"
+                topology = collect_host_topology([device()], sysfs=reader)
+                proximity = self.proximity(topology, "eth9")
+                self.assertEqual(proximity.proximity, Proximity.UNKNOWN)
+                self.assertIn("PCI", proximity.reason)
+                self.assertIsNone(topology.gpus[0].nearest_nic)
+
+    def test_missing_gpu_pci_path_cannot_use_same_device(self):
+        topology = self.collect([
+            ((ROOT_COMPLEX, "0000:17:00.1"), 0, {"eth0": ETH}),
+        ])
+        self.assertEqual(self.proximity(topology, "eth0").proximity, Proximity.UNKNOWN)
+        self.assertIsNone(topology.gpus[0].nearest_nic)
+
     def test_kernel_without_numa_node_is_unknown_not_guessed(self):
         topology = self.collect([
             ((ROOT_COMPLEX, GPU_ADDRESS), -1, {}),
@@ -268,6 +309,13 @@ class StabilityTests(TopologyFixture):
         # eth2 sits on the other socket, so it ranks after the local interfaces.
         self.assertEqual([item.proximity.value for item in gpu.nics],
                          ["same-switch", "same-root-complex", "cross-numa", "unknown"])
+
+    def test_missing_evidence_diagnostics_are_stable_when_input_order_changes(self):
+        reader = sysfs([])
+        devices = [device("0000:19:00.0", "GPU-b"), device()]
+        first = collect_host_topology(devices, sysfs=reader)
+        second = collect_host_topology(reversed(devices), sysfs=reader)
+        self.assertEqual(json.dumps(first.as_dict()), json.dumps(second.as_dict()))
 
     def test_serialization_keeps_evidence_and_sources(self):
         value = self.collect(self.LAYOUT).as_dict()

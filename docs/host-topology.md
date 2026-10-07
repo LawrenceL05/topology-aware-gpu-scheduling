@@ -49,6 +49,8 @@ part that touches a filesystem. Fixtures subclass it, so the classification
 logic is tested without a host, a GPU, or root access. Passing `inventory=` to
 `collect_host_topology()` reuses an inventory already read from the same host
 instead of collecting a second one.
+The supplied inventory's `node_id` must match the collector's `node_id`; a
+snapshot from another node is rejected instead of joining unrelated devices.
 
 Each `HostNIC` keeps its inventory record on `nic.interface`, so per-field
 provenance survives into the map: `nic.interface.speed_mbps` still names the
@@ -58,6 +60,11 @@ file it came from and how much the answer is worth, while `nic.speed_mbps`,
 ## How proximity is decided
 
 For each GPU and interface, the first rule that matches wins:
+
+Both PCI functions must first be present in the walked tree. If either path
+is missing or unreadable, the pair stays `unknown`, even when the addresses
+look like functions of the same device or the inventory reports a NUMA node.
+Only reported NIC NUMA readings participate in classification.
 
 | Proximity | Rule |
 | --- | --- |
@@ -97,8 +104,9 @@ rather than being copied into a second list that could drift from the first.
 
 Repeated discovery on an unchanged host produces identical output: GPUs are
 sorted by PCI address, interfaces by name, and each GPU's interfaces by
-proximity and then name. `as_dict()` contains only plain types, so a report can
-be compared or stored directly.
+proximity and then name. GPU UUID breaks equal-address ties, and diagnostics
+are sorted too, including when multiple devices lack evidence. `as_dict()`
+contains only plain types, so a report can be compared or stored directly.
 
 ## Run it
 
@@ -125,6 +133,12 @@ for topology in discover_host_topology():
               gpu.nearest_nic.nic_name if gpu.nearest_nic else None)
 ```
 
+Live GPU nodes must advertise unique `topology_node:<name>` markers, matching
+the [GPU inventory](v1.2-topology-discovery.md). Markers and a finite, positive
+timeout are validated before tasks are submitted. Probes do not retry
+automatically; timeout, submission failure, or probe failure triggers
+cancellation of submitted tasks while preserving the original error.
+
 ## Confidence limits
 
 - Proximity is structural. A NIC on the same switch is not necessarily faster
@@ -141,5 +155,6 @@ for topology in discover_host_topology():
   [affinity graph #16](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/issues/16)
   is where placement policies would consume them.
 - No physical multi-socket GPU host has been mapped yet. The rules are covered
-  by fixtures, and CI additionally runs the real reader against a Linux host
-  that has interfaces but no GPU.
+  by fixtures, Ray orchestration by mocked tests, and CI additionally runs the
+  real reader against a Linux host that has interfaces but no GPU. Mocked Ray
+  tests do not validate live NVML discovery on GPU nodes.

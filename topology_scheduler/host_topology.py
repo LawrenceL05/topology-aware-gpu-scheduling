@@ -19,6 +19,7 @@ from enum import Enum
 from typing import Iterable
 
 from .inventory import GPUDevice, _node_marker
+from .policy import positive
 from .nic_inventory import (
     PHYSICAL, NetworkInterface, NodeNICInventory, SysfsReader,
     collect_nic_inventory,
@@ -81,7 +82,8 @@ class HostNIC:
 
     @property
     def numa_node(self) -> int | None:
-        return self.interface.numa_node.value
+        reading = self.interface.numa_node
+        return reading.value if reading.known else None
 
     @property
     def speed_mbps(self) -> int | None:
@@ -274,6 +276,11 @@ def _classify(gpu_address: str, gpu_path: tuple[str, ...], gpu_numa: int | None,
         return NICProximity(proximity=Proximity.UNKNOWN, reason=(
             "interface has no PCI device, so it is virtual or not enumerated"
         ), **partial)
+    if not gpu_path or not nic.pci_path:
+        missing = "GPU" if not gpu_path else "interface"
+        return NICProximity(proximity=Proximity.UNKNOWN, reason=(
+            f"{missing} PCI function is absent or unreadable under /sys/devices"
+        ), **partial)
     if gpu_address.rsplit(".", 1)[0] == nic.pci_address.rsplit(".", 1)[0]:
         return NICProximity(proximity=Proximity.SAME_DEVICE, **partial)
     if len(common) >= 2:
@@ -312,6 +319,8 @@ def collect_host_topology(
     if inventory is None:
         inventory = collect_nic_inventory(
             sysfs=sysfs, node_id=node_id, node_name=node_name)
+    elif inventory.node_id != node_id:
+        raise ValueError("inventory node_id must match the host topology node_id")
     pci = _pci_devices(sysfs)
     nics, diagnostics = _place_nics(inventory, pci)
     diagnostics.extend(inventory.problems)
@@ -338,8 +347,8 @@ def collect_host_topology(
         ))
     return HostTopology(
         node_name=node_name, node_id=node_id,
-        gpus=tuple(sorted(localities, key=lambda gpu: gpu.pci_address)),
-        nics=tuple(nics), diagnostics=tuple(diagnostics),
+        gpus=tuple(sorted(localities, key=lambda gpu: (gpu.pci_address, gpu.uuid))),
+        nics=tuple(nics), diagnostics=tuple(sorted(diagnostics)),
     )
 
 
@@ -365,8 +374,7 @@ def discover_host_topology(*, timeout: float = 30) -> tuple[HostTopology, ...]:
     import ray
     from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
-    if timeout <= 0:
-        raise ValueError("timeout must be positive")
+    positive(timeout, "timeout")
     if not ray.is_initialized():
         raise RuntimeError("Call ray.init() before host topology discovery")
 
@@ -374,17 +382,29 @@ def discover_host_topology(*, timeout: float = 30) -> tuple[HostTopology, ...]:
              if node["Alive"] and node["Resources"].get("GPU", 0) > 0]
     if not nodes:
         raise ValueError("No live Ray nodes advertise GPU resources")
-    probe = ray.remote(num_cpus=0)(_probe_host_topology)
-    pending, metadata = [], []
+    metadata = []
     for node in nodes:
         node_id = node["NodeID"]
         _, name = _node_marker(node["Resources"], node_id)
-        pending.append(probe.options(
-            scheduling_strategy=NodeAffinitySchedulingStrategy(
-                node_id=node_id, soft=False)).remote())
         metadata.append((node_id, name))
-
-    results = ray.get(pending, timeout=timeout)
+    if len({name for _, name in metadata}) != len(metadata):
+        raise ValueError("Live Ray GPU nodes must have unique topology_node names")
+    metadata.sort(key=lambda item: item[1])
+    probe = ray.remote(num_cpus=0, max_retries=0)(_probe_host_topology)
+    pending = []
+    try:
+        for node_id, name in metadata:
+            pending.append(probe.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=node_id, soft=False)).remote())
+        results = ray.get(pending, timeout=timeout)
+    except BaseException:
+        for ref in pending:
+            try:
+                ray.cancel(ref, force=True)
+            except Exception:
+                pass  # Preserve the original failure if Ray is unavailable.
+        raise
     topologies = []
     for (expected_id, name), result in zip(metadata, results):
         if result["node_id"] != expected_id:
