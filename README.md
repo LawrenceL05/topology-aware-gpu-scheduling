@@ -70,6 +70,14 @@ GPU relationship graph and its current enforcement boundary. The
 **[single-GPU validation report](docs/one-gpu-validation.md)** records the first
 physical-GPU inventory, Ray assignment, oversubscription rejection, and direct
 CUDA smoke test.
+The **[typed topology graph](docs/topology-graph.md)** adds GPU, NIC, NUMA, and
+node entities with separate evidence-bearing relationships and affinity queries.
+Run `python -m examples.topology_graph` for a synthetic, GPU-free example.
+`TopologyGraph.from_observations()` adapts exported GPU/NIC/locality snapshots
+from the separate collectors, preserving their evidence and rejecting identity
+conflicts. Both current host NIC Reading fields and earlier scalar snapshots
+are supported. The example also accepts snapshot JSON files. Graph queries do not
+change planner scores or bind devices in Ray or KAI.
 
 ## Evaluation
 
@@ -90,8 +98,8 @@ This repository includes an initial Python placement policy, automatic
 intra-node GPU topology discovery, a network interface inventory, opt-in
 inter-node TCP link measurement, a Ray execution adapter, and a KAI Scheduler
 lifecycle adapter. It is an experimental foundation: real GPU benchmarks,
-real-workload traces, GPU-to-NIC affinity, and physical multi-node link validation
-are not yet included. The
+real-workload traces, automatic GPU-to-NIC affinity discovery, and physical
+multi-node link validation are not yet included. The
 [Dynamo lifecycle adapter](docs/dynamo-lifecycle.md) has CPU/fake-engine coverage;
 real Dynamo/CUDA inference remains unverified.
 
