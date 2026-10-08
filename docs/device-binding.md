@@ -124,6 +124,31 @@ Workload exceptions are also wrapped with that rank's identity and preserve
 the original cause. A failed run does not promise a complete record for every
 other rank, particularly tasks canceled or lost before they report.
 
+### Shared execution and trace records
+
+For the common recording path, pass `device_placement=placement` to
+`run_with_record(plan, planning, worker, ...)` with the default or named `ray`
+backend. It returns the usual worker results and an `ExecutionRecord`. Its JSON
+includes `device_verification` with `mode`, `requested_uuids`, and `assignments`.
+Set `device_mode="observe"` explicitly for diagnostic runs; the default is
+`verify`. KAI and custom backends do not support this option.
+
+`run_matched_trace()` accepts the same options. Because policies may select
+different nodes, `device_placement` can be a callable accepting the current
+`Plan` and returning a `DevicePlacement` in worker-rank order. Use one
+deterministic mapping rule and the same inventory for all policies. This
+caller-supplied mapping does not change placement scoring or make Ray select
+particular devices. Returning `None` fails the attempt rather than disabling
+verification. Selection and verification time are included in execution and JCT.
+
+Success, device refusal, and workload failures retain available identity
+evidence alongside link-cost provenance. A preflight failure has the requested
+UUIDs but no observations; a selector failure has `requested_uuids: null`.
+Neither claims to verify a device. Planning failures have no execution record,
+and a failed GPU-count baseline prevents normalization of that job under the
+other policies. Ordinary runs without `device_placement` retain their existing
+JSON shape. `observe` success does not imply that assignments matched.
+
 ## Run it without a GPU
 
 ```bash
@@ -137,7 +162,11 @@ reservation and task path on one local Ray node with **simulated** logical GPUs
 and stand-in NVML/CUDA identities. Driver-query tests cover missing libraries,
 driver errors, wrong visible-device counts, UUID decoding, and index mismatch
 even with `PCI_BUS_ID`; reservation tests cover duplicate UUIDs and resource
-overrides. These fixtures do not establish physical device assignment.
+overrides. [Record tests](../tests/test_device_execution_records.py) cover
+successful and failed identity evidence, per-plan mapping, and link provenance
+across all five policies. The Ray smoke also checks that refusal evidence
+survives error wrapping into the shared record and that all five policies
+export observations. These fixtures do not establish physical device assignment.
 
 ## Physical evidence
 

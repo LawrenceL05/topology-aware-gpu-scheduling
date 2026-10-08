@@ -16,7 +16,10 @@ import re
 import ray
 from ray.cluster_utils import Cluster
 
-from topology_scheduler import GPUDevice, Node, Plan
+from topology_scheduler import (
+    GPUDevice, Node, Plan, PolicyName, RecordedExecutionError, TraceJob, Workload,
+    plan_with_record, run_matched_trace, run_with_record,
+)
 from topology_scheduler.device_binding import (
     DEVICE_ORDER_ENV_VAR, OBSERVE, PCI_BUS_ID, VERIFY, DeviceBindingError,
     DevicePlacement, device_resources, run_with_devices,
@@ -97,16 +100,37 @@ def main():
             ray.get(counter.record.remote())
             return rank
         mismatch = None
+        checked_plan, planning = plan_with_record(
+            [Node("a", "SIMULATED", 2, 80)], Workload(2, 1, {"SIMULATED": 1}),
+            {}, policy=PolicyName.GPU_COUNT)
         try:
-            run_with_devices(plan, PLACEMENT, counted_worker, mode=VERIFY,
+            run_with_record(checked_plan, planning, counted_worker, device_placement=PLACEMENT,
                 devices_provider=lambda: DEVICES, cuda_provider=swapped_cuda, environ=SAFE_ENV)
-        except DeviceBindingError as error:
+        except RecordedExecutionError as error:
             mismatch = str(error)
-            assert error.assignments and error.assignments[0].assigned_uuid
+            evidence = error.record.as_dict()["device_verification"]
+            assert evidence["requested_uuids"] == list(PLACEMENT.uuids)
+            assert evidence["assignments"] and evidence["assignments"][0]["assigned_uuid"]
             assert "numbering or visibility differs" in mismatch
         assert mismatch is not None
         calls = ray.get(counter.total.remote())
         assert calls == 0, calls
+
+        trace = run_matched_trace(
+            [Node("a", "SIMULATED", 2, 80)],
+            [TraceJob("identity-smoke", Workload(2, 1, {"SIMULATED": 1}), worker)], {},
+            accelerator_type="SIMULATED", device_placement=lambda current: PLACEMENT,
+            device_mode=OBSERVE, devices_provider=lambda: DEVICES,
+            cuda_provider=simulated_cuda, environ=SAFE_ENV)
+        assert len(trace) == len(PolicyName)
+        for record in trace:
+            assert record.status == "succeeded", record.as_dict()
+            value = record.as_dict()["device_verification"]
+            assert value["mode"] == OBSERVE
+            assert value["requested_uuids"] == list(PLACEMENT.uuids)
+            assert len(value["assignments"]) == 2
+            assert all(item["identity_source"] == "injected" for item in value["assignments"])
+        json.dumps([record.as_dict() for record in trace], allow_nan=False)
 
         print(json.dumps({
             "simulated_logical_gpus": True, "simulated_device_identities": True,
@@ -117,6 +141,8 @@ def main():
             "unsafe_device_order_refused": refused,
             "cuda_nvml_disagreement_refused": mismatch is not None,
             "mismatched_worker_bodies_run": calls,
+            "failure_record_retained_device_evidence": True,
+            "trace_policies_with_device_evidence": len(trace),
         }, indent=2))
     finally:
         ray.shutdown()
