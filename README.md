@@ -84,6 +84,11 @@ Measured link costs can be supplied to the trace runner with
 the same bandwidth snapshot and its measured, advertised, fallback, or supplied
 source; see the [link measurement guide](docs/link-measurement.md).
 
+Ray runs can also pass `device_placement` to the recording and trace APIs to
+retain requested UUIDs and observed assignments on success or failure. See
+[device verification records](docs/device-binding.md#shared-execution-and-trace-records)
+for per-plan mappings, verification modes, and the limits of physical selection.
+
 ## Repository Status
 
 This repository includes an initial Python placement policy, automatic
@@ -112,6 +117,7 @@ evidence required for completion. Track live assignments and progress in
 - **[Ray integration and source guide](docs/ray-integration.md)**: explains the relevant Python and C++ components, our cost model, setup, and limitations.
 - **[Placement policy](topology_scheduler/policy.py)**: selects nodes using per-workload compute estimates, GPU memory/capacity and inter-node communication costs.
 - **[Ray adapter](topology_scheduler/ray_backend.py)**: atomically reserves bundles on those nodes, launches one task per GPU and releases resources on completion or failure.
+- **[Device identity binding](topology_scheduler/device_binding.py)**: reserves UUID request tokens and cross-checks the actual CUDA-visible UUID against the plan and NVML candidate before work; missing or mismatched identity is refused. Ray still selects the device; see the **[guide](docs/device-binding.md)**.
 - **[V1.2 GPU inventory](topology_scheduler/inventory.py)**: probes every live GPU node and reads GPU identity plus pairwise PCI/NUMA ancestry and direct NVLink counts through Ray's bundled NVIDIA NVML support.
 - **[NIC inventory](topology_scheduler/nic_inventory.py)**: reads each node's interfaces, their PCI function, NUMA node, driver, state, advertised speed, and RDMA devices, with per-field confidence; see the **[guide](docs/nic-inventory.md)** and run `python -m examples.nic_inventory`.
 - **[V1 Dynamo contract](docs/dynamo-v1-contract.md)**: pins the Ray, Dynamo, vLLM, Python, CUDA, driver, Linux, model, ownership, readiness, and shutdown contract for independent single-GPU replicas.

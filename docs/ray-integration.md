@@ -26,6 +26,8 @@ is the latest release. Upgrade only after rerunning the integration tests.
 | --- | --- | --- |
 | Placement policy | [policy.py](../topology_scheduler/policy.py) | Filters incompatible hardware and scores allocations of one GPU per worker. |
 | Execution adapter | [ray_backend.py](../topology_scheduler/ray_backend.py) | Validates node markers, reserves bundles, launches tasks and cleans up. |
+| Device identity binding | [device_binding.py](../topology_scheduler/device_binding.py) | Reserves UUID request tokens alongside Ray GPUs; checks the actual CUDA UUID against the plan and NVML candidate, refusing missing or mismatched identity before work. Tokens do not select a device. |
+| Device verification records | [comparison.py](../topology_scheduler/comparison.py) | Optional `device_placement` adds requests and available identity observations to successful and failed execution/trace records. A per-plan callable supports different policy placements. |
 | V1.2 inventory | [inventory.py](../topology_scheduler/inventory.py) | Pins a probe to every live Ray GPU node and reads NVIDIA devices and their pairwise relationships through NVML. |
 | Link measurement | [links.py](../topology_scheduler/links.py) | Opt-in: pins a TCP probe server and client to each ordered node pair and normalizes the results into planner bandwidth. |
 | Ray placement-group API | [placement_group.py](https://github.com/ray-project/ray/blob/ray-2.55.0/python/ray/util/placement_group.py) | Creates, waits for and removes resource reservations. |
@@ -215,10 +217,11 @@ with host-local TCP measurements and simulated logical GPUs.
 
 This is a functional task-placement prototype, not a complete distributed LLM
 inference service. Each task requests one CPU and one GPU. Ray assigns the
-physical GPU IDs; although V1.2 discovers intra-node relationships, the policy
-cannot select a particular NVLink pair within a node. The cost model still
-models inter-node links only. GPU memory is a supplied feasibility estimate,
-not an enforced memory reservation.
+physical GPU IDs; a rank can now verify which device it received and refuse a
+mismatch through [device identity binding](device-binding.md), but the policy
+still cannot select a particular NVLink pair within a node. The cost model
+still models inter-node links only. GPU memory is a supplied feasibility
+estimate, not an enforced memory reservation.
 
 For tensor-parallel inference, add model loading, rank rendezvous, collective
 communication and engine lifecycle handling in an appropriate worker/actor

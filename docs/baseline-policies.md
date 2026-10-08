@@ -74,6 +74,14 @@ validates and snapshots both mappings before any job runs. Every success or
 failure record retains the same per-link source and measurement timestamp;
 omitting the metadata labels caller-provided values as `supplied`. Resolve
 freshness before the trace; measurements are not refreshed between policies.
+For opt-in Ray [device verification](device-binding.md#shared-execution-and-trace-records),
+pass `device_placement` as a fixed placement or a deterministic function from
+each policy's `Plan` to its requested UUIDs. Use the same mapping rule and
+inventory for every policy. Records retain the verification mode, request, and
+available assignments even on refusal or worker failure; preflight failures
+have no observed assignments. `device_mode="observe"` is diagnostic and may
+succeed with unmatched devices. Mapping and verification count toward JCT;
+neither changes the policy score nor guarantees physical device selection.
 Custom backends must perform cleanup on success and failure, as required by the
 shared execution contract. Ray requests placement-group removal asynchronously;
 the next job waits for its own reservation before launching workers.

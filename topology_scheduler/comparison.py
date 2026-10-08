@@ -5,6 +5,9 @@ from math import isclose
 from time import perf_counter_ns
 from typing import Callable, Iterable, Mapping
 
+from .device_binding import (
+    MODES, VERIFY, DeviceAssignment, DeviceBindingError, DevicePlacement,
+)
 from .links import LinkCost, LinkCostSource
 from .policy import Node, Plan, PolicyName, Workload, choose_placement
 
@@ -39,6 +42,9 @@ class ExecutionRecord:
     status: str
     error: str | None = None
     backend: str = "custom"
+    device_mode: str | None = None
+    requested_device_uuids: tuple[str, ...] | None = None
+    device_assignments: tuple[DeviceAssignment, ...] = ()
 
     def as_dict(self) -> dict:
         value = self.planning.as_dict()
@@ -49,6 +55,13 @@ class ExecutionRecord:
         value["status"] = self.status
         value["error"] = self.error
         value["backend"] = self.backend
+        if self.device_mode is not None:
+            value["device_verification"] = {
+                "mode": self.device_mode,
+                "requested_uuids": (list(self.requested_device_uuids)
+                                    if self.requested_device_uuids is not None else None),
+                "assignments": [item.as_dict() for item in self.device_assignments],
+            }
         return value
 
 
@@ -132,10 +145,28 @@ def _planning_inputs(nodes, workload, bandwidth_gbps, accelerator_type, link_cos
 
 
 def run_with_record(plan: Plan, planning: PlanningRecord, worker, *, backend=None,
+                    device_placement: DevicePlacement | Callable[[Plan], DevicePlacement] | None = None,
+                    device_mode: str = VERIFY,
                     **backend_options):
-    """Execute any policy through the same backend and record terminal status."""
+    """Execute any policy through the same backend and record terminal status.
+
+    Ray callers can opt into device verification with a fixed ``DevicePlacement``
+    or a callable resolving one from each plan. Success and failure records keep
+    the request and any available observations. The callable is invoked inside
+    the execution boundary; invalid or missing mappings fail without running
+    work. Device-level relationships still do not influence planning.
+    """
     if plan.policy_name != planning.policy:
         raise ValueError("Plan and planning record policies must match")
+    if device_placement is not None:
+        if backend is not None and backend != "ray":
+            raise ValueError("device_placement requires the Ray backend")
+        if device_mode not in MODES:
+            raise ValueError(f"device_mode must be one of: {', '.join(MODES)}")
+        if not isinstance(device_placement, DevicePlacement) and not callable(device_placement):
+            raise ValueError("device_placement must be a DevicePlacement or a callable")
+    elif device_mode != VERIFY:
+        raise ValueError("device_mode requires device_placement")
     if backend is None or backend == "ray":
         backend_name = "ray"
         from .ray_backend import run as backend
@@ -147,17 +178,35 @@ def run_with_record(plan: Plan, planning: PlanningRecord, worker, *, backend=Non
     else:
         backend_name = getattr(backend, "__name__", "custom")
     started = perf_counter_ns()
-    try:
-        results = backend(plan, worker, **backend_options)
-    except Exception as error:
-        record = ExecutionRecord(
-            planning, started, perf_counter_ns(), "failed",
-            f"{type(error).__name__}: {error}", backend_name,
+    placement = None
+    assignments = ()
+
+    def terminal(status, error=None):
+        return ExecutionRecord(
+            planning, started, perf_counter_ns(), status, error, backend_name,
+            device_mode=device_mode if device_placement is not None else None,
+            requested_device_uuids=placement.uuids if placement is not None else None,
+            device_assignments=tuple(assignments),
         )
+
+    try:
+        if device_placement is None:
+            results = backend(plan, worker, **backend_options)
+        else:
+            from .device_binding import run_with_devices
+
+            selected = device_placement(plan) if callable(device_placement) else device_placement
+            if not isinstance(selected, DevicePlacement):
+                raise ValueError("device_placement callable must return a DevicePlacement")
+            placement = selected
+            results, assignments = run_with_devices(
+                plan, placement, worker, mode=device_mode, **backend_options)
+    except Exception as error:
+        if device_placement is not None and isinstance(error, DeviceBindingError):
+            assignments = error.assignments
+        record = terminal("failed", f"{type(error).__name__}: {error}")
         raise RecordedExecutionError(record) from error
-    return results, ExecutionRecord(
-        planning, started, perf_counter_ns(), "succeeded", backend=backend_name,
-    )
+    return results, terminal("succeeded")
 
 
 @dataclass(frozen=True)
@@ -241,6 +290,11 @@ def run_matched_trace(
     all policies, including planning/execution failure records. Resolve report
     freshness before starting the trace; this function does not run probes or
     refresh costs between jobs.
+
+    ``device_placement`` and ``device_mode`` are forwarded to ``run_with_record``.
+    Use the same deterministic placement callable for every policy when their
+    plans name different nodes. Device selection/verification time is part of
+    execution and JCT; requests and available observations survive trace export.
     """
     jobs = tuple(jobs)
     if not jobs:
