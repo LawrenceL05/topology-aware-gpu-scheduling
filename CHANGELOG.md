@@ -106,6 +106,18 @@ published release. See [current status and validation](docs/current-status.md).
   for every policy, including planning and execution failures
   ([PR #27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27)).
 
+- A CPU-only Dynamo dry run that prints the plan, replica configuration, and
+  launch intent without touching Ray, Dynamo, or a GPU, and an opt-in real-GPU
+  validation harness that skips with explicit reasons when prerequisites are
+  missing, exercises rollback, planned-versus-actual placement, repeated
+  completions on one reservation, and shutdown, and records hardware, versions,
+  commands, timings, and per-step status into a run report
+  ([PR #32](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/32)).
+  Failed runs retain partial results, original errors, and cleanup snapshots.
+  Cleanup uses adapter process proof and the exact Ray reservation rather than
+  driver-local ports; unrelated startup failures do not count as rollback proof.
+  No physical inference run report exists yet, so Dynamo serving stays GPU-unverified.
+
 ### Changed
 
 - Per-node Ray probes now return a complete GPU relationship graph alongside
