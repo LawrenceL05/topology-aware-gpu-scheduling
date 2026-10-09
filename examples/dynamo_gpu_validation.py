@@ -15,13 +15,14 @@ import platform
 import socket
 import subprocess
 import time
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Sequence
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from topology_scheduler.dynamo_backend import CONTRACT_PATH, DynamoConfig
+from topology_scheduler.policy import positive
 
 SKIPPED, PASSED, FAILED = "skipped", "passed", "failed"
 RAY_NAMESPACE = "topology-scheduler-dynamo"
@@ -29,13 +30,13 @@ RAY_NAMESPACE = "topology-scheduler-dynamo"
 
 def reachable(endpoint: str, timeout: float = 2) -> bool:
     """True when a TCP connection to an endpoint's host and port succeeds."""
-    parts = urlsplit(endpoint)
-    if not parts.hostname or not parts.port:
-        return False
     try:
+        parts = urlsplit(endpoint)
+        if not parts.hostname or not parts.port:
+            return False
         with socket.create_connection((parts.hostname, parts.port), timeout):
             return True
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
@@ -92,26 +93,64 @@ def completion(endpoint: str, served_model: str, *, timeout: float) -> tuple[str
     return content, latency
 
 
+def close_and_record(service) -> dict:
+    """Use node-local adapter cleanup proof and the exact Ray group, not localhost."""
+    from ray.util.placement_group import placement_group_table
+
+    before = service.status()
+    group = service.group
+    result = {"status": FAILED, "before_close": before}
+    try:
+        service.close()
+        result["after_close"] = service.status()
+        if result["after_close"]["state"] != "closed":
+            raise RuntimeError("Adapter did not confirm process cleanup")
+        result["process_cleanup_confirmed"] = True
+        # Ray removes placement groups asynchronously. Query this reservation,
+        # not global free GPU counts that unrelated jobs can change.
+        deadline = time.monotonic() + service.config.rpc_timeout
+        while group is not None:
+            state = placement_group_table(group).get("state")
+            result["reservation_state"] = state
+            if state == "REMOVED":
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Ray has not confirmed reservation removal")
+            time.sleep(min(0.1, max(0, deadline - time.monotonic())))
+        result["reservation_state"] = "REMOVED" if group is not None else "not_held"
+        result["status"] = PASSED
+    except Exception as error:
+        result["error"] = f"{type(error).__name__}: {error}"
+        result["after_close"] = service.status()
+    return result
+
+
 def rollback_check(plan, config) -> dict:
     """Start a deployment that cannot come up, and confirm nothing is left."""
     from topology_scheduler import DynamoService
     from topology_scheduler.dynamo_backend import DynamoLifecycleError
 
     # A model that cannot be fetched: the engine exits, so startup must roll back.
-    broken = replace(config, namespace=f"{config.namespace}-rollback",
+    broken = replace(config, namespace=f"{config.namespace[:54]}-rollback",
                      model="topology-scheduler/does-not-exist", revision="0" * 40)
     service = DynamoService(plan, broken)
+    result = {"status": FAILED, "config": asdict(broken)}
     try:
         service.start()
-    except (DynamoLifecycleError, RuntimeError, ValueError) as error:
-        return {"status": PASSED, "error": str(error)[:400],
-                "state": service.status()["state"]}
+        result["error"] = "a start that cannot come up still succeeded"
+    except Exception as error:
+        result["error"] = f"{type(error).__name__}: {error}"
+        # Preflight, missing runtime, reservation, or cleanup errors are not
+        # evidence that an engine launched and its failure was rolled back.
+        result["expected_engine_failure"] = (
+            isinstance(error, DynamoLifecycleError)
+            and "Replica engine exited" in str(error)
+            and bool(service.status()["replicas"]))
     finally:
-        try:
-            service.close()
-        except Exception as error:  # noqa: BLE001 - recorded, not swallowed
-            return {"status": FAILED, "error": f"cleanup failed: {error}"}
-    return {"status": FAILED, "error": "a start that cannot come up still succeeded"}
+        result["cleanup"] = close_and_record(service)
+    if result.get("expected_engine_failure") and result["cleanup"]["status"] == PASSED:
+        result["status"] = PASSED
+    return result
 
 
 def validate(arguments, config) -> dict:
@@ -122,10 +161,12 @@ def validate(arguments, config) -> dict:
         DynamoService, Workload, choose_placement, discover_planner_nodes,
     )
 
-    ray.init(address="auto", namespace=RAY_NAMESPACE)
-    report: dict = {"steps": {}}
+    report: dict = {"status": FAILED, "steps": {}, "config": asdict(config)}
     service = None
+    stage = "connect"
     try:
+        ray.init(address="auto", namespace=RAY_NAMESPACE)
+        stage = "inventory_and_plan"
         nodes = discover_planner_nodes()
         report["inventory"] = [
             {"name": node.name, "gpu_model": node.gpu_model,
@@ -138,8 +179,12 @@ def validate(arguments, config) -> dict:
         report["plan"] = plan.as_dict()
         report["commands"] = [config.worker_command()]
 
-        report["steps"]["rollback"] = rollback_check(plan, config)
+        stage = "rollback"
+        report["steps"][stage] = rollback_check(plan, config)
+        if report["steps"][stage]["status"] != PASSED:
+            raise RuntimeError("Controlled startup rollback was not confirmed")
 
+        stage = "startup"
         started = time.perf_counter()
         service = DynamoService(plan, config)
         service.start()
@@ -148,7 +193,9 @@ def validate(arguments, config) -> dict:
         status = service.status()
         report["replicas"] = status["replicas"]
         report["deployment_id"] = status["deployment_id"]
+        report["steps"][stage] = {"status": PASSED, "snapshot": status}
 
+        stage = "placement"
         planned = [node.name for node in plan.workers]
         node_ids = {name: next(
             node["NodeID"] for node in ray.nodes()
@@ -161,13 +208,19 @@ def validate(arguments, config) -> dict:
             "gpu_ids": [record["gpu_ids"] for record in status["replicas"]],
             "log_paths": [record["log_path"] for record in status["replicas"]],
         }
+        if report["steps"][stage]["status"] != PASSED:
+            raise RuntimeError("Replicas did not run on the planned nodes")
 
+        stage = "requests"
         replies, latencies = [], []
+        report["request_latency_seconds"] = latencies
+        report["steps"][stage] = {"status": FAILED, "count": 0, "replies": replies}
         for _ in range(arguments.requests):
             content, latency = completion(
                 service.endpoint, config.model, timeout=arguments.request_timeout)
             replies.append(content)
             latencies.append(latency)
+            report["steps"][stage]["count"] = len(replies)
         # More than one request without releasing the reservation in between.
         report["request_latency_seconds"] = latencies
         report["steps"]["requests"] = {
@@ -175,23 +228,19 @@ def validate(arguments, config) -> dict:
             "count": len(replies), "replies": replies,
         }
 
-        service.close()
-        released = all(
-            not reachable(f"http://127.0.0.1:{config.system_port_base + rank}")
-            for rank in range(len(plan.workers)))
-        report["steps"]["shutdown"] = {
-            "status": PASSED if released else FAILED,
-            "state": service.status()["state"],
-            "available_gpus_after_close": ray.available_resources().get("GPU"),
-        }
-        service = None
+    except Exception as error:
+        report["error"] = f"{type(error).__name__}: {error}"
+        report["failure_stage"] = stage
+        step = report["steps"].setdefault(stage, {})
+        step.update(status=FAILED, error=report["error"])
     finally:
         if service is not None:
-            try:
-                service.close()
-            except Exception:  # noqa: BLE001 - the report already carries the failure
-                pass
-        ray.shutdown()
+            report["steps"]["shutdown"] = close_and_record(service)
+        try:
+            ray.shutdown()
+        except Exception as error:
+            report["steps"]["disconnect"] = {
+                "status": FAILED, "error": f"{type(error).__name__}: {error}"}
     statuses = {step["status"] for step in report["steps"].values()}
     report["status"] = FAILED if FAILED in statuses else PASSED
     return report
@@ -212,6 +261,22 @@ def main(argv=None) -> int:
     parser.add_argument("--frontend-url", default=None)
     parser.add_argument("--report", default="dynamo-gpu-validation.json")
     arguments = parser.parse_args(argv)
+    if arguments.requests < 2:
+        parser.error("--requests must be at least 2 to validate repeated requests")
+    if arguments.replicas < 1:
+        parser.error("--replicas must be positive")
+    try:
+        positive(arguments.memory_gb, "memory_gb")
+        positive(arguments.request_timeout, "request_timeout")
+        compute = json.loads(arguments.compute_seconds)
+        if not isinstance(compute, dict) or not compute:
+            raise ValueError("--compute-seconds must be a nonempty JSON object")
+        for model, seconds in compute.items():
+            if not model.strip():
+                raise ValueError("GPU model names must be nonempty")
+            positive(seconds, "compute_seconds")
+    except (ValueError, TypeError) as error:
+        parser.error(str(error))
 
     overrides = {name: value for name, value in
                  (("namespace", arguments.namespace),
@@ -228,14 +293,22 @@ def main(argv=None) -> int:
     reasons = check_prerequisites(
         opted_in=arguments.run, system=platform.system(), gpus=gpus,
         frontend=reachable(config.frontend_url),
-        etcd=reachable(config.etcd_endpoints), nats=reachable(config.nats_server),
+        etcd=all(reachable(endpoint.strip()) for endpoint in config.etcd_endpoints.split(",")),
+        nats=reachable(config.nats_server),
         config=config)
     if reasons:
         report = {"status": SKIPPED, "reasons": list(reasons),
                   "environment": environment, "simulated_gpus_used": False}
     else:
-        report = dict(validate(arguments, config), environment=environment,
-                      simulated_gpus_used=False)
+        try:
+            report = validate(arguments, config)
+        except Exception as error:
+            # Also produce evidence if a missing optional import or unexpected
+            # harness error occurs before the lifecycle report is available.
+            report = {"status": FAILED, "failure_stage": "validation",
+                      "error": f"{type(error).__name__}: {error}", "steps": {},
+                      "config": asdict(config)}
+        report.update(environment=environment, simulated_gpus_used=False)
     Path(arguments.report).write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))

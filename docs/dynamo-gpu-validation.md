@@ -76,24 +76,42 @@ and exits 0 with `"status": "skipped"`. A skipped run is not a pass.
 With every prerequisite present it discovers the inventory through NVML, plans
 a placement, and then, in order:
 
-1. starts a deployment whose model cannot be fetched, and confirms the failure
-   rolls back and cleans up;
+1. starts a deployment whose model cannot be fetched, requires evidence that a
+   replica engine exited, and confirms cleanup. Namespace, runtime, reservation,
+   or other preflight failures do not count as a successful rollback test;
 2. starts the real replicas and records startup and model-load time;
 3. checks each replica landed on its planned node, recording node ids, GPU ids,
    and log paths;
 4. sends several OpenAI-compatible completions through the frontend, asserting a
    nonempty reply each time, without releasing the reservation in between;
-5. closes the deployment and confirms no worker port still answers and the GPUs
-   came back.
+5. closes the deployment, requires the adapter's node-local process cleanup
+   confirmation, and waits for the exact Ray placement group to become `REMOVED`.
+   It does not use driver-local ports or global free-GPU counts as proof that
+   remote replicas stopped.
 
 The report records the hardware, the pinned versions, the endpoints, the worker
-command, per-replica log paths, the timings, and a status for every step.
-Commit or attach it; that file is the completion evidence.
+command, per-replica log paths, the timings, and a status for every attempted step.
+Startup, placement, request, and connection errors produce a failed report and
+nonzero exit status. Partial replies and latencies survive a later request
+failure, and cleanup failures are recorded alongside the original error. A failed
+rollback stops the validation before the real model is started; a placement
+mismatch stops it before requests. `--requests` must be at least two, replicas
+must be positive, and timing/memory/profile inputs must be positive and finite.
+Keep the report as an external run artifact; a passing physical report is the
+completion evidence, while a failed or skipped report is not.
 
 ## Clean up
 
 `close()` runs automatically, including after a failure, and the adapter keeps
 a cleanup receipt so an unconfirmed cleanup is retained rather than forgotten.
+The report includes the original config and the deployment snapshots before and
+after cleanup, including reservation identity and replica log/receipt paths.
+If cleanup cannot be confirmed, the report remains failed and preserves the
+metadata for the [lifecycle recovery procedure](dynamo-lifecycle.md#shutdown-driver-death-and-retained-reservations).
+An already-closed service without a group handle is reported as `not_held`;
+otherwise the exact group is polled for removal within the configured RPC
+timeout. This confirms the adapter's owned resources, not cluster-wide GPU
+availability or the absence of unrelated processes.
 If a run is killed before it can finish:
 
 ```bash
@@ -138,3 +156,9 @@ been executed against the pinned image, no engine has ever reported itself
 ready, and no completion has been served. Tensor-parallel and disaggregated
 prefill/decode validation remain follow-on work and are rejected by the adapter
 today.
+
+The CPU-only [harness tests](../tests/test_dynamo_validation_lifecycle.py) use
+mocked Ray and service responses to check partial failure reports, cleanup
+confirmation, asynchronous reservation removal, placement rejection, and
+controlled rollback classification. They validate the harness logic, not a
+real Dynamo deployment or hardware cleanup.
