@@ -24,6 +24,10 @@ from .nic_inventory import (
     NetworkInterface, NodeNICInventory, RDMADevice, Reading, SysfsReader,
     collect_nic_inventory, discover_nic_inventory,
 )
+from .host_topology import (
+    GPULocality, HostNIC, HostTopology, NICProximity, Proximity,
+    collect_host_topology, discover_host_topology, normalize_pci_address,
+)
 
 __all__ = [
     "DynamoConfig", "DynamoService", "DynamoLifecycleError", "DynamoCleanupError",
@@ -39,4 +43,6 @@ __all__ = [
     "NetworkInterface", "NodeNICInventory", "RDMADevice", "Reading",
     "SysfsReader", "collect_nic_inventory", "discover_nic_inventory",
     "validate_submission", "TraceJob", "TraceRecord", "run_matched_trace",
+    "GPULocality", "HostNIC", "HostTopology", "NICProximity", "Proximity",
+    "collect_host_topology", "discover_host_topology", "normalize_pci_address",
 ]

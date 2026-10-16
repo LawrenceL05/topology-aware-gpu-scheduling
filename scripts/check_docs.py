@@ -27,6 +27,7 @@ REFERENCE = re.compile(r"\[([^\]\n]+)\]\[([^\]\n]*)\]")
 CPU_COMMANDS = (
     "python -m examples.plan",
     "python -m examples.compare_policies",
+    "python -m examples.host_topology",
     "python -m examples.kai_manifest",
     "python -m examples.kai_submit --help",
     "python -m examples.nic_inventory",
