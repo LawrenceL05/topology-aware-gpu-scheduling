@@ -108,6 +108,13 @@ published release. See [current status and validation](docs/current-status.md).
 
 ### Changed
 
+- Complete the release workflow with current milestone gates, exact-commit CI
+  and version checks, generated notes reconciled with the changelog, verified
+  annotated tags, and recovery after interrupted publication. Propose 0.2.0
+  from reviewed merged work without changing the package version or publishing
+  a release
+  ([PR #40](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/40)).
+
 - Per-node Ray probes now return a complete GPU relationship graph alongside
   the V1.1 device inventory
   ([PR #7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)).
