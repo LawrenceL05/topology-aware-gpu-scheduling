@@ -48,9 +48,10 @@ release notes, because downstream comparisons depend on it.
 ## Version rules
 
 The project is below 1.0. Under
-[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) a major
-version of zero means the public API is not yet stable, so the guarantees sit
-one position to the right of where they will after 1.0.
+[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html), a major
+version of zero means the public API is not yet stable. This project adopts
+the following additional convention for 0.x; SemVer itself does not require
+this convention.
 
 | Change | While 0.x | After 1.0 |
 | --- | --- | --- |
@@ -76,6 +77,10 @@ Release candidates are optional. When one is useful, tag it `vX.Y.Z-rc.N`,
 mark the GitHub Release as a pre-release, and never reuse the candidate number.
 The final `vX.Y.Z` is always a separate tag, even when it points at the same
 commit as the last candidate.
+For a candidate, Python package metadata uses the PEP 440 spelling `X.Y.ZrcN`;
+the changelog, Git tag, and GitHub Release use `X.Y.Z-rc.N` (with `v` for the
+tag and Release title). These identify the same candidate. Final releases use
+exactly `X.Y.Z` in both package metadata and the changelog.
 
 The published 0.1.1 release predates this guide. It added
 `discover_planner_nodes()`, which these rules would classify as a minor change.
@@ -83,12 +88,22 @@ The rules apply from the next release forward; earlier tags are not revised.
 
 ## What blocks a release
 
-Issue #18 proposes four milestones: Topology Discovery, Dynamo Integration,
-Evaluation, and Next Release. They do not exist in the repository yet. Once
-they do, only **Next Release** gates a tag: each issue in it must be closed, or
-moved out with a comment explaining the deferral, before the tag is created.
-Until the milestones exist, the release manager makes that judgment explicitly
-in the release pull request instead.
+The four milestones defined in the [roadmap](roadmap.md) now exist on GitHub:
+Topology Discovery, Dynamo Integration, Evaluation, and
+[Next Release](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/milestone/4).
+Only **Next Release** gates a tag. Before tagging, every selected blocker must
+be closed or explicitly deferred with a linked reason and follow-up. Keep
+research issues in their original milestones and collect their merged PRs and
+evidence in a release-readiness issue in Next Release, as the roadmap requires.
+An empty milestone alone is not a readiness review.
+
+The readiness issue records the selected scope, previous tag, proposed version
+and rationale, release-preparation PR, exact release commit, CI run links,
+validation artifacts, compatibility changes, known limitations, and deferrals.
+It may stay open to record the tag and GitHub Release URLs after publication;
+it must not leave any pre-publication blocker unresolved. Close it only after
+the published artifacts have been verified. Process issue #20 does not itself
+authorize a release.
 
 The research milestones do not block a release. Open experimental work is the
 normal state of this repository; it is disclosed under **Known limitations** in
@@ -96,7 +111,9 @@ the release notes rather than held against the tag.
 
 Independent of any milestone, a release is blocked when:
 
-- the Tests workflow is not green on the exact commit to be tagged;
+- the Tests workflow or any other required check is not successful on the
+  exact commit to be tagged (missing, pending, cancelled, or skipped required
+  checks do not count as passing);
 - `python scripts/check_docs.py --run-examples` fails, which also means the
   version table in [current status and versions](current-status.md) has drifted
   from `pyproject.toml` and the contracts;
@@ -111,12 +128,15 @@ logical GPUs, mocked backends, or synthetic inputs.
 
 ## Release checklist
 
-Steps 1 through 9 happen on a branch and merge through an ordinary pull
-request. Nothing is tagged until step 11.
+Steps 1 through 9 prepare a release through an ordinary pull request. Nothing
+is tagged until step 11.
 
-1. Review the Next Release milestone. Close, or explicitly defer, every issue
-   in it.
-2. Confirm the Tests workflow is green on `main`.
+1. Review Next Release and record the scope, blockers, evidence, and deferrals
+   in the readiness issue. Close or explicitly defer each pre-publication
+   blocker; research milestones may remain open with their limits disclosed.
+2. Start from a clean, up-to-date `main` with no staged, unstaged, or untracked
+   files. Fetch upstream branches and tags, and confirm current CI is green.
+   Prepare changes on a new branch; do not tag that branch.
 3. Reconcile `CHANGELOG.md` against what actually merged since the previous
    tag. See [drafting release notes](#drafting-release-notes) for the commands
    that list it. Every user-visible entry needs its implementation pull request
@@ -134,13 +154,22 @@ request. Nothing is tagged until step 11.
    the previous one.
 8. Update the README and any guide in `docs/` whose commands, public API,
    assumptions, or limitations changed.
-9. Run `python scripts/check_docs.py --run-examples` from the repository root
-   and fix what it reports.
-10. Merge the pull request and wait for the Tests workflow to pass on the
-    resulting `main` commit. That commit is the release commit.
-11. Create the annotated tag on the release commit.
-12. Push the tag.
-13. Create the GitHub Release from the tag with reviewed release notes.
+9. Install the declared dependencies and run `python -m unittest discover -s
+   tests -v` and `python scripts/check_docs.py --run-examples` from the repository
+   root. Draft the release notes against the preparation branch's current SHA,
+   review them manually, and link validation evidence and missing hardware
+   coverage in the readiness issue. Reconcile the draft again against the
+   selected merge SHA after step 10, before publishing it.
+10. Merge the preparation PR and select its resulting `main` commit. Verify
+    the Tests workflow and all other required checks on that exact SHA. Record
+    the successful run URLs; a green PR head does not validate a merge commit.
+11. Verify a clean checkout of that SHA, its presence on `origin/main`, and
+    agreement among package version, status table, changelog, and proposed tag.
+    Create an annotated tag on that exact SHA using the checks below.
+12. Push only that tag and verify the remote tag object and peeled commit.
+13. Create the GitHub Release from the existing tag with manually reviewed
+    notes. Verify its title, tag, target commit, notes, and pre-release flag;
+    record its URL and the tag URL in the readiness issue before closing it.
 14. Open a fresh empty `Unreleased` section in `CHANGELOG.md` for the next
     cycle.
 
@@ -150,24 +179,69 @@ Tags are annotated, never lightweight, so that the tagger, date, and release
 message are recorded in the object itself. The existing `v0.1.0` and `v0.1.1`
 tags are both annotated; that is the standard to keep.
 
-The tag name is `vX.Y.Z` with a leading lowercase `v` and no other prefix or
-suffix. The tag message is a single line naming the version and the headline of
+The final tag name is `vX.Y.Z` with a leading lowercase `v` and no other prefix
+or suffix; optional candidates use `vX.Y.Z-rc.N` as described above.
+The tag message is a single line naming the version and the headline of
 the release, following the existing `V0.1.1 automatic GPU inventory` form.
 
-```bash
-git checkout main
-git pull --ff-only
-git log -1 --oneline
-git tag -a v0.2.0 -m "V0.2.0 KAI backend and topology discovery"
-git push origin v0.2.0
-```
-
-Before pushing, confirm the tag points where it should:
+The following commands require Bash, Git, an authenticated GitHub CLI (`gh`),
+and upstream release permissions. They are manual maintainer steps, not part
+of the offline docs checker. Replace `X.Y.Z` only after reviewing the scope;
+the placeholders below are not a version selection. Stop on any failed check.
 
 ```bash
-git show v0.2.0 --stat --no-patch
-git describe --exact-match --tags HEAD
+git fetch origin main --tags
+git switch main
+git pull --ff-only origin main
+git status --short --untracked-files=all
 ```
+
+The last command must print nothing. Select the preparation PR's merge SHA
+from the readiness issue, rather than assuming the current branch tip is the
+reviewed release commit:
+
+```bash
+version=X.Y.Z
+tag="v$version"
+release_commit=REPLACE_WITH_FULL_REVIEWED_MAIN_SHA
+git merge-base --is-ancestor "$release_commit" origin/main
+git switch --detach "$release_commit"
+git status --short --untracked-files=all
+gh run list --repo LawrenceL05/topology-aware-gpu-scheduling \
+  --workflow tests.yml --branch main --event push --commit "$release_commit" \
+  --json databaseId,headSha,status,conclusion,url
+gh api "repos/LawrenceL05/topology-aware-gpu-scheduling/commits/$release_commit/check-runs" \
+  --paginate --jq '.check_runs[] | [.name, .head_sha, .status, .conclusion, .html_url] | @tsv'
+```
+
+Again require an empty status. Inspect the successful completed Tests run with
+`gh run view RUN_ID --repo LawrenceL05/topology-aware-gpu-scheduling`; both
+`docs` and `test` jobs must succeed. Verify any additional required checks from
+the repository's active branch protection/rulesets, including status contexts
+if used, against this SHA. An empty run list or missing check blocks tagging.
+Record the reviewed SHA and evidence links in the readiness issue.
+
+At this checkout, verify `pyproject.toml`, the version table in
+`docs/current-status.md`, and `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` all
+identify the selected release (using the candidate spelling rule if needed).
+Run the documentation checker again. Confirm the selected name is unused both
+locally (`git tag --list "$tag"`) and remotely (`git ls-remote --tags origin
+"refs/tags/$tag" "refs/tags/$tag^{}"`); both must be empty. Then:
+
+```bash
+git tag -a "$tag" "$release_commit" -m "V$version reviewed release"
+git cat-file -t "$tag"
+git rev-parse "$tag^{commit}"
+git show --no-patch "$tag"
+git push origin "refs/tags/$tag"
+git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}"
+```
+
+`git cat-file` must return `tag`; the peeled commit must equal
+`release_commit`. Compare the remote tag object ID with `git rev-parse "$tag"`
+and the remote peeled `^{}` value with `release_commit`. Never force-push.
+If publication is interrupted, inspect the existing objects and resume from
+the verified tag; do not recreate it or assign it to another commit.
 
 A tag must point at a commit that is on `main` and has a passing Tests run.
 Tagging a branch commit, a commit with a failing or missing check, or a commit
@@ -180,12 +254,17 @@ described below. The tag is the source of truth; the Release is the readable
 presentation of it.
 
 ```bash
-gh release create v0.2.0 --title "v0.2.0" --notes-file release-notes.md
+gh release create "$tag" --repo LawrenceL05/topology-aware-gpu-scheduling \
+  --verify-tag --title "$tag" --notes-file "$notes_file"
+gh release view "$tag" --repo LawrenceL05/topology-aware-gpu-scheduling \
+  --json tagName,name,isDraft,isPrerelease,url,body
 ```
 
-Keep `release-notes.md` out of the repository: it is a scratch file for the
-`gh` invocation, not a tracked artifact. Mark release candidates with
-`--prerelease`.
+`notes_file` is the reviewed scratch file prepared below, outside the checkout.
+`--verify-tag` prevents the CLI from silently creating a missing tag. Mark
+release candidates with `--prerelease`. If Release creation fails after the tag
+push, verify that the remote tag is still the reviewed annotated object and
+retry Release creation for that same tag.
 
 ## Drafting release notes
 
@@ -193,23 +272,36 @@ Start from the changelog section for the version, then check it against what
 merged. Neither source is sufficient alone: the changelog can lag, and pull
 request titles describe work rather than user-visible behavior.
 
+Use the reviewed `version`, `tag`, and `release_commit` values above. Substitute
+the previous release tag for `v0.1.1`:
+
 ```bash
-git log --oneline v0.1.1..HEAD
-git diff --stat v0.1.1..HEAD
-git log -1 --format=%cs v0.1.1
-gh pr list --state merged --base main --limit 100 \
-  --search "merged:>=2026-09-14" --json number,title,mergedAt,url
+previous_tag=v0.1.1
+git log --oneline "$previous_tag..$release_commit"
+git diff --stat "$previous_tag..$release_commit"
+notes_file=$(mktemp)
+gh api --method POST \
+  repos/LawrenceL05/topology-aware-gpu-scheduling/releases/generate-notes \
+  -f tag_name="$tag" -f target_commitish="$release_commit" \
+  -f previous_tag_name="$previous_tag" --jq .body > "$notes_file"
 ```
 
-Substitute the previous release tag for `v0.1.1`. The third command prints that
-tag's commit date, which is the value to pass to `merged:>=` so the pull request
-list covers the same range as the commit list.
+The generate-notes endpoint drafts text from merged PRs without creating a tag
+or publishing a Release; see GitHub's
+[generate-notes API](https://docs.github.com/en/rest/releases/releases#generate-release-notes-content-for-a-release).
+Reconcile that draft against the version's changelog
+section and exact Git range above, then edit the scratch file into the required
+sections below. Follow pagination for any supplemental `gh pr list` query;
+a date filter alone does not establish inclusion in the release commit. Verify
+each linked implementation PR or merged commit is in the selected range,
+remove duplicates or reverted changes, and explain user-visible behavior.
 
 Every draft is reviewed by hand before publication. Generated text is a
 starting point; the maintainer is responsible for the claims in it, especially
 validation claims.
 
-Release notes contain these sections, omitting any that is genuinely empty:
+Release notes contain all five sections. Write `None` when no feature or fix
+applies, and state explicitly when compatibility is unchanged:
 
 ```markdown
 ## Features
@@ -242,9 +334,11 @@ A published tag is immutable. It is never moved, deleted, or reused after a
 GitHub Release or any announcement references it. Corrections ship as a new
 version.
 
-- **Wrong content in a published release.** Fix it on `main` and release the
-  next patch version. Add a `Fixed` entry to the changelog naming the version
-  that was affected.
+- **Wrong content in a published release.** Fix it through a PR to `main` and
+  release a new version under the version rules (normally a patch, but not if
+  the correction changes compatibility). Add a `Fixed` entry naming the
+  affected version. For a bad deployment, restore the previous known-good
+  version while the correction is prepared; never reset the published tag.
 - **A release that should not be used.** Keep the tag, edit the GitHub Release
   body to state at the top that the version is withdrawn and which version
   replaces it, and record the withdrawal in the changelog. Deleting the
@@ -273,15 +367,30 @@ exists. A development version is a placeholder, not a commitment: the value is
 decided by the [version rules](#version-rules) at release preparation, not by
 the number already sitting in the file.
 
-The `Unreleased` section holds substantial new capability: the KAI Scheduler
-adapter and backend selection, intra-node GPU topology discovery with the
-public `GPUConnection` model, five reference baseline policies, the V1 Dynamo
-contract, and the documentation validation rules. Under the version rules that
-is a minor change while at 0.x, so the first candidate under this process is
-**0.2.0**, which means raising `pyproject.toml` from `0.1.2` at step 5 of the
-checklist rather than tagging the development value as-is.
+Review of merged work through
+[0265ec6](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/commit/0265ec6)
+against `v0.1.1` finds new public capabilities: KAI lifecycle/backend selection
+([#13](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/13)),
+GPU relationship discovery
+([#7](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/7)),
+persistent Dynamo replicas
+([#30](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/30)),
+NIC inventory
+([#33](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/33)),
+matched policy traces
+([#34](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/34)),
+and opt-in TCP link measurements
+([#27](https://github.com/LawrenceL05/topology-aware-gpu-scheduling/pull/27)).
+The Ray pin also changed from 2.49.0 to 2.55.0. Under the project's 0.x rules,
+these warrant at least a minor bump; **0.2.0** is the proposed first candidate
+version, rather than the development placeholder `0.1.2`.
 
-That candidate is a proposal, not a decision. It holds only if a review of the
-merged work confirms the changelog is complete and no incompatible change was
-missed, and the release still waits on the Next Release milestone from issue
-#18 being defined and cleared.
+This review proposes a version, not a release authorization or a package bump.
+The readiness review must reconcile all merged work, including later commits,
+and confirm compatibility and validation before selecting the final version.
+The [single-GPU report](one-gpu-validation.md) is physical inventory/assignment
+and CUDA smoke evidence, not inference or multi-node benchmark evidence.
+Dynamo inference, live KAI, physical GPU-pair topology, and physical multi-node
+TCP measurements remain unverified. They may remain open if explicitly
+deferred and disclosed; required validation for the selected scope still gates
+the release. This process update creates neither a tag nor a GitHub Release.
